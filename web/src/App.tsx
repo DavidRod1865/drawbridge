@@ -4,6 +4,8 @@ import { ProjectPicker } from './components/ProjectPicker.tsx';
 import { DropZone } from './components/DropZone.tsx';
 import { ReviewTable } from './components/ReviewTable.tsx';
 import { CreatableSelect } from './components/CreatableSelect.tsx';
+import { DrawingAreaBrowser } from './components/DrawingAreaBrowser.tsx';
+import { AreaDrawings } from './components/AreaDrawings.tsx';
 import { UploadPanel } from './components/UploadPanel.tsx';
 import { useAuth } from './state/useAuth.ts';
 import { usePackage } from './state/usePackage.ts';
@@ -275,24 +277,29 @@ export function App() {
                   />
                 </label>
 
-                <label className="inline">
-                  Drawing Area
-                  <CreatableSelect
-                    items={areas}
-                    value={areaId}
-                    placeholder="Choose an area…"
-                    createLabel="+ New Drawing Area…"
-                    newLabel="New area name"
-                    onCreate={(name) => createDrawingArea(selection.project.id, name)}
-                    onChange={setAreaId}
-                    onCreated={(area) => setAreas((current) => [...current, area])}
-                  />
-                </label>
-
                 {sheets.length > 0 && (
                   <span className="muted">Applied to all {sheets.length} sheets.</span>
                 )}
               </div>
+            )}
+
+            {/* Browse the project's Drawing Areas and see what each already holds before
+                choosing one. Selecting an area also targets it for upload (the area-fanout
+                effect stamps it onto every sheet), so browse and pick are one action. Only
+                shown pre-upload; once files are added the ReviewTable takes over. */}
+            {!uploading && !uploadResult && sheets.length === 0 && (
+              <>
+                <DrawingAreaBrowser
+                  areas={areas}
+                  selectedAreaId={areaId}
+                  onSelect={setAreaId}
+                  onCreate={(name) => createDrawingArea(selection.project.id, name)}
+                  onCreated={(area) => setAreas((current) => [...current, area])}
+                />
+                {areaId !== null && (
+                  <AreaDrawings revisions={revisions} sets={sets} areaId={areaId} />
+                )}
+              </>
             )}
 
             {sheets.length === 0 &&

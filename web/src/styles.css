@@ -358,6 +358,104 @@ select:disabled {
   min-width: 210px;
 }
 
+/* ---------------------------------------------------------------- area browser */
+
+.area-card {
+  max-width: none;
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+
+.area-card-head {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.area-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
+.area-item {
+  padding: 6px var(--s3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.area-item:hover:not(.active) {
+  border-color: var(--muted);
+}
+
+/* The selected area wears the accent, matching how a picked option reads elsewhere. */
+.area-item.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.discipline-group {
+  display: grid;
+  gap: var(--s2);
+}
+
+/* A full-width toggle: the whole heading row is the click target for collapse. */
+.discipline-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  width: 100%;
+  margin: 0;
+  padding: 6px var(--s2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-align: left;
+  cursor: pointer;
+}
+
+.discipline-heading:hover {
+  background: var(--surface-alt);
+}
+
+/* Right-pointing triangle that rotates down when the table is open. */
+.chevron {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid var(--muted);
+  transition: transform 0.12s ease;
+}
+
+.chevron.open {
+  transform: rotate(90deg);
+}
+
+.discipline-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
 /* ---------------------------------------------------------------- review panel */
 
 .review {
@@ -473,11 +571,18 @@ select:disabled {
 }
 
 .col-check      { width: 40px; }
-.col-number     { width: 190px; }
+.col-number     { width: 80px; }
 .col-title      { width: 330px; }
 .col-discipline { width: 190px; }
-.col-rev        { width: 80px; }
+.col-rev        { width: 40px; }
 .col-status     { width: 250px; }
+.col-date       { width: 100px; }
+.col-set        { width: 250px; }
+
+/* Floor width for the browse tables' six columns (Sheet #, Title, Set, Rev, 2× date). */
+.browse-table {
+  min-width: 1020px;
+}
 
 /*
  * Ghost inputs: the table reads as data, with controls surfacing on approach.
