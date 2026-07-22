@@ -1,0 +1,38 @@
+# Render blueprint: a persistent Node service running the Fastify API. The frontend is
+# hosted on Netlify, which proxies /api/* here (see web/public/_redirects), so Render is
+# API-only and never builds the SPA.
+#
+# Build is just `npm install` — the server runs TypeScript directly via Node's native
+# type-stripping, so there is no build step and no devDependencies are needed at runtime.
+# (Do NOT add `npm run build` here: NODE_ENV=production makes npm skip devDependencies,
+# which the web build needs — that combination is what fails the deploy.)
+services:
+  - type: web
+    name: drawbridge
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run start --workspace=server
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: PROCORE_ENV
+        value: sandbox
+      # Set these two to this service's public URL AFTER the first deploy gives you the
+      # domain, then also register the callback URL in the Procore Developer Portal.
+      #   WEB_ORIGIN            = https://<your-service>.onrender.com
+      #   PROCORE_REDIRECT_URI  = https://<your-service>.onrender.com/api/auth/callback
+      - key: WEB_ORIGIN
+        sync: false
+      - key: PROCORE_REDIRECT_URI
+        sync: false
+      # Secrets — set in the Render dashboard, never commit them.
+      - key: PROCORE_CLIENT_ID
+        sync: false
+      - key: PROCORE_CLIENT_SECRET
+        sync: false
+      # 32 bytes hex (64 chars): openssl rand -hex 32
+      - key: SESSION_ENCRYPTION_KEY
+        sync: false

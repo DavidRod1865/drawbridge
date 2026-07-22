@@ -1,7 +1,7 @@
 {
   "name": "drawbridge",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Stateless guided upload portal for Procore's Drawings tool",
   "type": "module",
   "workspaces": [

@@ -1,5 +1,8 @@
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
+import fastifyStatic from '@fastify/static';
 import { config } from './config.ts';
 import { authRoutes } from './routes/auth.ts';
 import { proxyRoutes } from './routes/proxy.ts';
@@ -37,5 +40,32 @@ app.get('/api/health', async () => ({ ok: true, procoreEnv: config.procore.env }
 
 await app.register(authRoutes);
 await app.register(proxyRoutes);
+
+// In production the server is the single origin: it serves the built SPA alongside the
+// `/api/*` routes above. This is what keeps the httpOnly session cookie same-origin (no
+// CORS/SameSite dance) and the single-flight token refresh in one persistent process.
+// In development the SPA is served by Vite on its own port, so we skip this entirely.
+// web/dist relative to this file (server/src/index.ts): up to server/src, up to server,
+// up to the repo root, then into web/dist. Resolved from import.meta.url so it holds no
+// matter which directory the host process is started from.
+const spaRoot = fileURLToPath(new URL('../../web/dist', import.meta.url));
+
+// Serve the SPA only when a build is actually present. This supports two topologies from
+// one codebase: a single-origin deploy that builds web/dist and serves it here, and an
+// API-only deploy (SPA hosted elsewhere, e.g. Netlify) where dist is absent and we skip
+// static serving entirely rather than 500 on a missing index.html.
+if (config.isProduction && existsSync(spaRoot)) {
+  await app.register(fastifyStatic, { root: spaRoot });
+
+  // SPA fallback: any unmatched GET returns index.html so client-side routes work on a
+  // hard refresh or deep link. An unmatched /api/* path is a real 404 — never answer a
+  // fetch() with HTML, which would surface downstream as a confusing JSON parse error.
+  app.setNotFoundHandler((request, reply) => {
+    if (request.method !== 'GET' || request.url.startsWith('/api/')) {
+      return reply.code(404).send({ error: 'not_found' });
+    }
+    return reply.sendFile('index.html');
+  });
+}
 
 await app.listen({ port: config.port, host: '0.0.0.0' });

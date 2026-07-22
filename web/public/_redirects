@@ -1,0 +1,14 @@
+# Netlify redirect rules. Vite copies web/public/* into dist/, so this ships with the SPA.
+#
+# Rule 1 — API proxy. Status 200 makes this a *rewrite* (a server-side proxy), not a
+# browser redirect: the URL bar stays on netlify.app, so the httpOnly session cookie the
+# Render server sets is stored first-party. This is what lets us keep the same-origin
+# cookie design while the API lives on a different host.
+#
+# !! Replace the host below with your real Render service URL (Render dashboard → your
+#    service → the .onrender.com URL at the top). :splat forwards the rest of the path.
+/api/*  https://drawbridge-web.onrender.com/api/:splat  200
+
+# Rule 2 — SPA fallback. Everything else serves the app shell so client-side routes and
+# hard refreshes / deep links don't 404. Must come AFTER the /api rule.
+/*      /index.html  200

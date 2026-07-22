@@ -299,6 +299,12 @@ export function App() {
     return <LoginScreen {...(state.error ? { error: state.error } : {})} />;
   }
 
+  // Deep links to the Procore Drawings tool must follow the active environment — the
+  // API host is switched server-side by PROCORE_ENV, but this client-built URL isn't,
+  // so derive it from the environment the server reported.
+  const procoreHost =
+    state.environment === 'production' ? 'https://app.procore.com' : 'https://sandbox.procore.com';
+
   const uploadBlocker =
     setId === null
       ? 'Choose a Drawing Set before uploading.'
@@ -443,7 +449,7 @@ export function App() {
                 running={uploading}
                 procoreUrl={
                   selection
-                    ? `https://sandbox.procore.com/${selection.project.id}/project/drawing_areas`
+                    ? `${procoreHost}/${selection.project.id}/project/drawing_areas`
                     : null
                 }
                 onRetry={() => void startUpload(uploadProgress)}
