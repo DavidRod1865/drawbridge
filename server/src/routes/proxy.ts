@@ -70,6 +70,13 @@ export async function proxyRoutes(app: FastifyInstance): Promise<void> {
     const query = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
     const target = `${config.procore.host}/rest/${path}${query}`;
 
+    // TEMP DIAGNOSTIC: confirm whether the browser actually sent the Procore-Company-Id
+    // header (Procore requires it for company-scoped calls; a null here explains the 404s).
+    request.log.info(
+      { path, companyHeader: request.headers['procore-company-id'] ?? null },
+      'proxying to Procore',
+    );
+
     const headers: Record<string, string> = { authorization: `Bearer ${session.accessToken}` };
     for (const [key, value] of Object.entries(request.headers)) {
       if (!STRIPPED_HEADERS.has(key) && typeof value === 'string') {
