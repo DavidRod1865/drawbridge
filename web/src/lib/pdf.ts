@@ -188,6 +188,39 @@ export async function parseFile(data: ArrayBuffer, sourceFile: string): Promise<
 }
 
 /**
+ * Paints a page onto `canvas` at `scale` and reports the CSS-pixel box the caller should
+ * lay the canvas out in.
+ *
+ * `scale` already folds in devicePixelRatio (the preview computes fitScale * zoom * DPR),
+ * so the backing store is sized in device pixels for crisp text at any zoom, while the
+ * returned width/height are the CSS pixels to display it at. Rendering — not CSS-scaling a
+ * single bitmap — is what keeps a title block legible when the user zooms in to read it.
+ *
+ * The render is not cancellable here; the caller guards fast page-flipping by discarding a
+ * resolved render whose sheet is no longer current.
+ */
+export async function renderPageToCanvas(
+  doc: PDFDocumentProxy,
+  pageNumber: number,
+  canvas: HTMLCanvasElement,
+  scale: number,
+): Promise<{ width: number; height: number }> {
+  const page = await doc.getPage(pageNumber);
+  const viewport = page.getViewport({ scale });
+  const context = canvas.getContext('2d');
+  if (!context) throw new PdfError('Could not get a 2D canvas context', 'unknown');
+
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  await page.render({ canvasContext: context, viewport }).promise;
+
+  // CSS size = device size / DPR. The caller passed DPR inside `scale`, so divide it back
+  // out to get the layout box; the extra device pixels stay in the backing store.
+  const dpr = window.devicePixelRatio || 1;
+  return { width: canvas.width / dpr, height: canvas.height / dpr };
+}
+
+/**
  * Extracts one page as a standalone single-page PDF.
  *
  * Called lazily, one page at a time, immediately before that page is uploaded — a

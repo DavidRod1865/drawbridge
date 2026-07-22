@@ -171,24 +171,27 @@ export function Select({
                 </CommandGroup>
               </>
             )}
-            {actionLabel && onAction && (
-              <>
-                <CommandSeparator />
-                <CommandGroup>
-                  <CommandItem
-                    className="text-primary data-[selected=true]:text-primary"
-                    onSelect={() => {
-                      setOpen(false);
-                      setSearch('');
-                      onAction();
-                    }}
-                  >
-                    {actionLabel}
-                  </CommandItem>
-                </CommandGroup>
-              </>
-            )}
           </CommandList>
+          {/* The create action is pinned below the list, not a CommandItem: as a plain
+              button it is exempt from cmdk's filtering, so "+ New …" stays visible even
+              when the search matches nothing (exactly when the user wants to create it),
+              and never scrolls out of view in a long list. */}
+          {actionLabel && onAction && (
+            <>
+              <div className="-mx-1 my-1 h-px bg-border" />
+              <button
+                type="button"
+                className="flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-primary hover:bg-muted"
+                onClick={() => {
+                  setOpen(false);
+                  setSearch('');
+                  onAction();
+                }}
+              >
+                {actionLabel}
+              </button>
+            </>
+          )}
         </Command>
       </PopoverContent>
     </Popover>

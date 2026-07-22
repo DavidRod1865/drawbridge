@@ -17,12 +17,14 @@ export function LoginScreen({ error }: { error?: string }) {
         {/* Accent rule — the blueprint's title-block edge. */}
         <div className="h-1 bg-primary" />
         <div className="p-8">
-          <p className="font-mono text-[11px] tracking-[0.2em] text-muted-foreground uppercase">
-            Procore · Drawings
-          </p>
-          <h1 className="mt-3 font-heading text-3xl font-semibold tracking-tight">Drawbridge</h1>
-          <p className="mt-2 text-muted-foreground">
-            Validate and upload drawing packages to Procore, without the cleanup.
+          {/* Full logo carries the name and tagline, so no separate heading is needed. */}
+          <img
+            src="/logo-with-name.png"
+            alt="Drawbridge — guided uploads, direct to Procore"
+            className="mx-auto w-72"
+          />
+          <p className="mt-4 text-center text-muted-foreground">
+            Validate and upload drawing packages directly to Procore<br/>All in one place, without the cleanup.
           </p>
 
           {error && (

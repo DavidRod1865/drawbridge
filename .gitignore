@@ -10,6 +10,9 @@ coverage/
 # Playwright MCP artifacts
 .playwright-mcp/
 *.png
+# …but the app's logo assets must ship.
+!web/public/logo-image.png
+!web/public/logo-with-name.png
 
 # Local-only notes and scratch docs
 CLAUDE.md

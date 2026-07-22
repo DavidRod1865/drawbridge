@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, Eye, SlidersHorizontal } from 'lucide-react';
 import { DisciplinePicker } from './DisciplinePicker.tsx';
 import { DisciplineField } from './DisciplineField.tsx';
+import { SheetPreviewDialog } from './SheetPreviewDialog.tsx';
 import { StatusBadge, type StatusTone } from './StatusBadge.tsx';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,6 +23,8 @@ import type { DrawingRevision } from '../lib/procore.ts';
 interface Props {
   sheets: readonly PlannedSheet[];
   existingRevisions: readonly DrawingRevision[];
+  /** Source file handles, keyed by sheet id, for rendering the preview. */
+  files: ReadonlyMap<string, File>;
   onUpdate: (ids: readonly string[], patch: Partial<PlannedSheet>) => void;
   /** An upload-level blocker outside per-sheet validation, e.g. no Drawing Set chosen. */
   blockedReason?: string | null;
@@ -55,6 +58,7 @@ const HEAD = 'border border-border bg-muted/50 px-2 text-xs font-medium';
 export function ReviewTable({
   sheets,
   existingRevisions,
+  files,
   onUpdate,
   blockedReason,
   drawingSetName,
@@ -63,6 +67,8 @@ export function ReviewTable({
 }: Props) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
+  // Index of the sheet open in the preview dialog; -1 when closed.
+  const [previewIndex, setPreviewIndex] = useState(-1);
 
   const verdicts = useMemo(
     () => validateSheets(sheets, existingRevisions),
@@ -204,17 +210,22 @@ export function ReviewTable({
 
       <div className="max-h-[62vh] overflow-auto">
         {/* border-collapse + per-cell borders = real grid (border-r alone was too easy to miss). */}
-        <Table className="w-full min-w-[1060px] table-fixed border-collapse">
+        <Table className="w-full min-w-[1100px] table-fixed border-collapse">
           <TableHeader className="sticky top-0 z-10">
             <TableRow className="hover:bg-transparent">
+              <TableHead className={cn(HEAD, 'w-10')}>
+                <div className="flex items-center justify-center">
+                  <Checkbox
+                    checked={allSelected}
+                    aria-label="Select all sheets"
+                    onCheckedChange={() =>
+                      setSelected(allSelected ? new Set() : new Set(sheets.map((s) => s.id)))
+                    }
+                  />
+                </div>
+              </TableHead>
               <TableHead className={cn(HEAD, 'w-10 text-center')}>
-                <Checkbox
-                  checked={allSelected}
-                  aria-label="Select all sheets"
-                  onCheckedChange={() =>
-                    setSelected(allSelected ? new Set() : new Set(sheets.map((s) => s.id)))
-                  }
-                />
+                <span className="sr-only">Preview</span>
               </TableHead>
               <TableHead className={cn(HEAD, 'w-[116px]')}>Sheet #</TableHead>
               <TableHead className={cn(HEAD, 'min-w-0')}>Title</TableHead>
@@ -226,7 +237,7 @@ export function ReviewTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sheets.map((sheet) => {
+            {sheets.map((sheet, rowIndex) => {
               const verdict = verdicts.get(sheet.id);
               const issues = verdict?.issues ?? [];
               const isBlocked = issues.some((i) => i.blocking);
@@ -242,12 +253,26 @@ export function ReviewTable({
                       'bg-destructive/[0.03] shadow-[inset_3px_0_0_var(--destructive)] hover:bg-destructive/[0.06]',
                   )}
                 >
+                  <TableCell className={CELL}>
+                    <div className="flex items-center justify-center">
+                      <Checkbox
+                        checked={selected.has(sheet.id)}
+                        aria-label={`Select sheet ${sheet.sheetNumber ?? ''}`}
+                        onCheckedChange={() => toggle(sheet.id)}
+                      />
+                    </div>
+                  </TableCell>
                   <TableCell className={cn(CELL, 'text-center')}>
-                    <Checkbox
-                      checked={selected.has(sheet.id)}
-                      aria-label={`Select sheet ${sheet.sheetNumber ?? ''}`}
-                      onCheckedChange={() => toggle(sheet.id)}
-                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label={`Preview sheet ${sheet.sheetNumber ?? sheet.sourceFile}`}
+                      onClick={() => setPreviewIndex(rowIndex)}
+                    >
+                      <Eye />
+                    </Button>
                   </TableCell>
                   <TableCell className={CELL}>
                     <Input
@@ -349,6 +374,18 @@ export function ReviewTable({
           Upload {sheetCount(summary.new + summary.revision + summary.older + summary.unknown)}
         </Button>
       </div>
+
+      {previewIndex >= 0 && (
+        <SheetPreviewDialog
+          sheets={sheets}
+          index={previewIndex}
+          files={files}
+          verdicts={verdicts}
+          onUpdate={onUpdate}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(-1)}
+        />
+      )}
     </section>
   );
 }

@@ -315,7 +315,8 @@ export function App() {
   return (
     <div className="blueprint-grid flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 flex items-center gap-3 border-b bg-card/90 px-4 py-2.5 backdrop-blur sm:px-6">
-        {/* App name — always visible. */}
+        {/* Logo mark + name — always visible. */}
+        <img src="/logo-image.png" alt="" aria-hidden className="h-7 w-auto object-contain" />
         <span className="font-heading text-lg font-semibold tracking-tight">Drawbridge</span>
         {state.environment === 'sandbox' && (
           <Badge
@@ -346,11 +347,11 @@ export function App() {
           <>
             <Button variant="ghost" size="sm" onClick={returnHome}>
               <Home aria-hidden />
-              <span className="hidden sm:inline">Home</span>
+              <span className="hidden sm:inline">Project Home</span>
             </Button>
             <Button variant="ghost" size="sm" onClick={changeProject}>
               <ArrowLeftRight aria-hidden />
-              <span className="hidden sm:inline">Change project</span>
+              <span className="hidden sm:inline">Change Project</span>
             </Button>
             <Separator orientation="vertical" className="mx-0.5 h-5!" />
           </>
@@ -365,7 +366,12 @@ export function App() {
         className={
           sheets.length > 0 || uploading || uploadResult
             ? 'grid w-full flex-1 content-start px-3 pt-4 pb-6'
-            : 'grid flex-1 content-start justify-items-center px-6 pt-6 pb-8'
+            : // The project picker is a short, self-contained block: center it in the
+              // viewport. Once a project is chosen the page grows (area browser, review),
+              // so that state stays top-aligned.
+              !selection
+              ? 'grid flex-1 content-center justify-items-center px-6 py-8'
+              : 'grid flex-1 content-start justify-items-center px-6 pt-6 pb-8'
         }
       >
         {!selection ? (
@@ -467,6 +473,7 @@ export function App() {
               <ReviewTable
                 sheets={sheets}
                 existingRevisions={revisions}
+                files={pkg.filesById.current}
                 blockedReason={uploadBlocker}
                 drawingSetName={setsForPicker.find((set) => set.id === setId)?.name ?? null}
                 drawingAreaName={areas.find((area) => area.id === areaId)?.name ?? null}
