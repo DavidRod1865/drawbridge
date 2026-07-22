@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+.vite/
+coverage/
+
+# Playwright MCP artifacts
+.playwright-mcp/
+*.png
+
+# Local-only notes and scratch docs
+CLAUDE.md
+docs/
