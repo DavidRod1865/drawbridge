@@ -31,7 +31,7 @@ export function authorizeUrl(state: string): string {
     response_type: 'code',
     state,
   });
-  return `${config.procore.host}/oauth/authorize?${params}`;
+  return `${config.procore.authHost}/oauth/authorize?${params}`;
 }
 
 async function requestToken(body: Record<string, string>): Promise<Session> {
@@ -44,7 +44,7 @@ async function requestToken(body: Record<string, string>): Promise<Session> {
     ...body,
   });
 
-  const response = await request(`${config.procore.host}/oauth/token`, {
+  const response = await request(`${config.procore.authHost}/oauth/token`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: form.toString(),

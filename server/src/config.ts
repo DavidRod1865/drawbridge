@@ -15,10 +15,21 @@ function required(name: string): string {
   return value;
 }
 
-/** Procore runs a separate sandbox host for development against test projects. */
+/**
+ * Procore hosts, per environment.
+ *
+ * `auth` serves the OAuth flow (authorize + token); `api` serves the REST API. In
+ * SANDBOX both live on one host, which is why a single host sufficed for a long time. In
+ * PRODUCTION they are DIFFERENT: `app.procore.com` is the web/login host, and the REST API
+ * lives on `api.procore.com`. Pointing REST calls at `app.procore.com` in production makes
+ * some endpoints (e.g. the projects collection) 404 with "Item not found" while others
+ * (e.g. /companies) still work — a legacy surface that only partially overlaps the real
+ * API. Confirmed 2026-07-22: the identical GET /rest/v1.0/projects?company_id=... returns
+ * the full list on api.procore.com but 404s on app.procore.com.
+ */
 const PROCORE_HOSTS = {
-  sandbox: 'https://sandbox.procore.com',
-  production: 'https://app.procore.com',
+  sandbox: { auth: 'https://sandbox.procore.com', api: 'https://sandbox.procore.com' },
+  production: { auth: 'https://app.procore.com', api: 'https://api.procore.com' },
 } as const;
 
 export type ProcoreEnv = keyof typeof PROCORE_HOSTS;
@@ -35,7 +46,11 @@ export const config = {
 
   procore: {
     env: procoreEnv,
-    host: PROCORE_HOSTS[procoreEnv],
+    // authHost: OAuth authorize + token exchange. apiHost: the REST API. Same host in
+    // sandbox, different in production (see PROCORE_HOSTS). PROCORE_API_HOST overrides the
+    // REST host if Procore ever moves it again.
+    authHost: PROCORE_HOSTS[procoreEnv].auth,
+    apiHost: process.env.PROCORE_API_HOST ?? PROCORE_HOSTS[procoreEnv].api,
     clientId: required('PROCORE_CLIENT_ID'),
     clientSecret: required('PROCORE_CLIENT_SECRET'),
     redirectUri: process.env.PROCORE_REDIRECT_URI ?? 'http://localhost:3001/api/auth/callback',
