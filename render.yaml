@@ -8,7 +8,9 @@
 # which the web build needs — that combination is what fails the deploy.)
 services:
   - type: web
-    name: drawbridge
+    # Named to match the existing service URL (drawbridge-web.onrender.com) that
+    # web/public/_redirects proxies to. Keep them in sync if you rename.
+    name: drawbridge-web
     runtime: node
     plan: free
     buildCommand: npm install
@@ -20,10 +22,10 @@ services:
         value: production
       - key: PROCORE_ENV
         value: sandbox
-      # Set these two to this service's public URL AFTER the first deploy gives you the
-      # domain, then also register the callback URL in the Procore Developer Portal.
-      #   WEB_ORIGIN            = https://<your-service>.onrender.com
-      #   PROCORE_REDIRECT_URI  = https://<your-service>.onrender.com/api/auth/callback
+      # These are the NETLIFY domain (where the browser actually is), not the Render
+      # domain — the browser only ever touches Netlify, which proxies /api/* in here.
+      #   WEB_ORIGIN            = https://drawbridge.netlify.app
+      #   PROCORE_REDIRECT_URI  = https://drawbridge.netlify.app/api/auth/callback
       - key: WEB_ORIGIN
         sync: false
       - key: PROCORE_REDIRECT_URI
