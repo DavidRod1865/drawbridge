@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Select } from './Select.tsx';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 /** Any Procore resource picked by name — Drawing Areas and Drawing Sets both fit. */
 export interface NamedResource {
@@ -76,9 +78,10 @@ export function CreatableSelect<T extends NamedResource>({
 
   if (creating) {
     return (
-      <div className="inline-create">
-        <input
+      <span className="inline-flex flex-wrap items-center gap-1.5">
+        <Input
           autoFocus
+          className="h-[34px] w-[160px]"
           placeholder={newLabel}
           value={name}
           disabled={busy}
@@ -88,19 +91,20 @@ export function CreatableSelect<T extends NamedResource>({
             if (event.key === 'Escape') setCreating(false);
           }}
         />
-        <button className="button subtle tiny" disabled={busy} onClick={() => void submit()}>
+        <Button variant="outline" size="sm" disabled={busy} onClick={() => void submit()}>
           {busy ? 'Creating…' : 'Create'}
-        </button>
-        <button className="button subtle tiny" disabled={busy} onClick={() => setCreating(false)}>
+        </Button>
+        <Button variant="ghost" size="sm" disabled={busy} onClick={() => setCreating(false)}>
           Cancel
-        </button>
-        {error && <div className="issue blocking">{error}</div>}
-      </div>
+        </Button>
+        {error && <span className="w-full text-xs text-destructive">{error}</span>}
+      </span>
     );
   }
 
   return (
     <Select
+      className="min-w-[210px]"
       options={items.map((item) => ({ value: String(item.id), label: item.name }))}
       value={value === null ? null : String(value)}
       placeholder={placeholder}

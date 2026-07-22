@@ -1,4 +1,7 @@
 import { useRef, useState } from 'react';
+import { UploadCloud } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface Props {
   onFiles: (files: File[]) => void;
@@ -64,7 +67,11 @@ export function DropZone({ onFiles, disabled }: Props) {
 
   return (
     <div
-      className={`dropzone${active ? ' active' : ''}${disabled ? ' disabled' : ''}`}
+      className={cn(
+        'rounded-lg border border-dashed bg-card px-6 py-14 text-center transition-colors',
+        active ? 'border-primary bg-primary/5' : 'border-input',
+        disabled && 'pointer-events-none opacity-55',
+      )}
       onDragOver={(event) => {
         event.preventDefault();
         if (!disabled) setActive(true);
@@ -72,17 +79,21 @@ export function DropZone({ onFiles, disabled }: Props) {
       onDragLeave={() => setActive(false)}
       onDrop={(event) => void handleDrop(event)}
     >
-      <p className="dropzone-title">Drop drawing files or folders here</p>
-      <p className="muted">
+      <UploadCloud
+        className={cn('mx-auto size-8', active ? 'text-primary' : 'text-muted-foreground')}
+      />
+      <p className="mt-3 text-base font-semibold">Drop drawing files or folders here</p>
+      <p className="mt-1 text-sm text-muted-foreground">
         Multi-page packages are split automatically. PDFs only.
       </p>
-      <button
-        className="button subtle"
+      <Button
+        variant="outline"
+        className="mt-4"
         disabled={disabled}
         onClick={() => inputRef.current?.click()}
       >
         Choose files
-      </button>
+      </Button>
       <input
         ref={inputRef}
         type="file"

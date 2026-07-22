@@ -1,0 +1,215 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Self-hosted fonts — no runtime CDN request, matching the app's no-external-fetch
+   posture. Geist for UI, Bricolage Grotesque for the wordmark/headings (technical
+   warmth), IBM Plex Mono for anything that must read as data: sheet numbers,
+   revisions, IDs, dates. */
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/bricolage-grotesque";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-sans: 'Geist Variable', system-ui, -apple-system, sans-serif;
+    --font-heading: 'Bricolage Grotesque Variable', 'Geist Variable', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+
+    /* Status hues for the review pills — exposed as tokens so a StatusBadge can use
+       `bg-status-new/…` utilities instead of scattering hex around the app. */
+    --color-status-new: var(--status-new);
+    --color-status-new-foreground: var(--status-new-foreground);
+    --color-status-revision: var(--status-revision);
+    --color-status-revision-foreground: var(--status-revision-foreground);
+    --color-status-duplicate: var(--status-duplicate);
+    --color-status-duplicate-foreground: var(--status-duplicate-foreground);
+    --color-status-older: var(--status-older);
+    --color-status-older-foreground: var(--status-older-foreground);
+    --color-status-unknown: var(--status-unknown);
+    --color-status-unknown-foreground: var(--status-unknown-foreground);
+
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+}
+
+/*
+ * Blueprint theme (light).
+ *
+ * Cool architectural-slate neutrals so the single warm element — safety orange, the
+ * original Drawbridge accent — stays unmistakable. This is the palette from the old
+ * styles.css, re-expressed in shadcn's token vocabulary.
+ */
+:root {
+    --background: #f3f5f8;
+    --foreground: #14181d;
+    --card: #ffffff;
+    --card-foreground: #14181d;
+    --popover: #ffffff;
+    --popover-foreground: #14181d;
+
+    --primary: #e8590c;
+    --primary-foreground: #ffffff;
+
+    --secondary: #e9edf1;
+    --secondary-foreground: #1f2933;
+    --muted: #eef1f4;
+    --muted-foreground: #6b7683;
+    --accent: #eaeef2;
+    --accent-foreground: #14181d;
+
+    --destructive: #b42318;
+
+    --border: #e0e5ea;
+    --input: #cbd2da;
+    --ring: #e8590c;
+
+    /* Data-viz / accent hues, drafting-palette. */
+    --chart-1: #e8590c;
+    --chart-2: #1849a9;
+    --chart-3: #027a48;
+    --chart-4: #b54708;
+    --chart-5: #9f1ab1;
+
+    --status-new: #eef4ff;
+    --status-new-foreground: #1849a9;
+    --status-revision: #ecfdf3;
+    --status-revision-foreground: #027a48;
+    --status-duplicate: #f1f3f6;
+    --status-duplicate-foreground: #4a545f;
+    --status-older: #fffaeb;
+    --status-older-foreground: #b54708;
+    --status-unknown: #fdf4ff;
+    --status-unknown-foreground: #9f1ab1;
+
+    --radius: 0.5rem;
+
+    --sidebar: #f8fafc;
+    --sidebar-foreground: #14181d;
+    --sidebar-primary: #e8590c;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #eaeef2;
+    --sidebar-accent-foreground: #14181d;
+    --sidebar-border: #e0e5ea;
+    --sidebar-ring: #e8590c;
+}
+
+/*
+ * Dark blueprint — deep drafting-table ink. The original app shipped light-only; this
+ * is a coherent bonus that activates only under a `.dark` root class.
+ */
+.dark {
+    --background: #0e1116;
+    --foreground: #e6e9ee;
+    --card: #161b22;
+    --card-foreground: #e6e9ee;
+    --popover: #161b22;
+    --popover-foreground: #e6e9ee;
+
+    --primary: #fb7a2c;
+    --primary-foreground: #14181d;
+
+    --secondary: #20262e;
+    --secondary-foreground: #e6e9ee;
+    --muted: #1b2129;
+    --muted-foreground: #9aa4b0;
+    --accent: #20262e;
+    --accent-foreground: #e6e9ee;
+
+    --destructive: #f97066;
+
+    --border: #262d36;
+    --input: #333c46;
+    --ring: #fb7a2c;
+
+    --status-new: #16233d;
+    --status-new-foreground: #97b6f0;
+    --status-revision: #10281d;
+    --status-revision-foreground: #6fce9a;
+    --status-duplicate: #20262e;
+    --status-duplicate-foreground: #9aa4b0;
+    --status-older: #2a2110;
+    --status-older-foreground: #e0a86a;
+    --status-unknown: #271433;
+    --status-unknown-foreground: #d98fe0;
+
+    --sidebar: #0e1116;
+    --sidebar-foreground: #e6e9ee;
+    --sidebar-primary: #fb7a2c;
+    --sidebar-primary-foreground: #14181d;
+    --sidebar-accent: #20262e;
+    --sidebar-accent-foreground: #e6e9ee;
+    --sidebar-border: #262d36;
+    --sidebar-ring: #fb7a2c;
+}
+
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+    body {
+        @apply bg-background text-foreground;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+    }
+    html {
+        @apply font-sans;
+    }
+    ::selection {
+        background: color-mix(in oklab, var(--primary) 22%, transparent);
+    }
+}
+
+@layer components {
+    /*
+     * Faint drafting grid for the app shell — the "blueprint" signature. Two layered
+     * gradients draw a 22px minor grid; kept very low-contrast so table data always
+     * wins the foreground. Fixed attachment so it reads as paper under the content.
+     */
+    .blueprint-grid {
+        background-color: var(--background);
+        background-image:
+            linear-gradient(to right, color-mix(in oklab, var(--foreground) 4%, transparent) 1px, transparent 1px),
+            linear-gradient(to bottom, color-mix(in oklab, var(--foreground) 4%, transparent) 1px, transparent 1px);
+        background-size: 22px 22px;
+        background-attachment: fixed;
+    }
+}

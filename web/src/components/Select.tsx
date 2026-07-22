@@ -1,4 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Check, ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 export interface SelectOption {
   value: string;
@@ -16,20 +29,26 @@ interface Props {
   actionLabel?: string;
   onAction?: () => void;
   ariaLabel?: string;
+  /** Merged onto the trigger button — layout/width control from the caller. */
   className?: string;
+  /**
+   * Let the filter box commit a value that isn't in `options` (Enter or the
+   * "Use …" row). Used where Procore accepts free-form names.
+   */
+  allowCustom?: boolean;
 }
 
 /** Above this many options the panel gets a filter box. */
 const FILTER_THRESHOLD = 8;
 
 /**
- * Custom dropdown.
+ * Filterable dropdown built on Radix Popover + cmdk Command.
  *
- * A native <select> is used nowhere in the app because macOS renders its popup
- * itself — the open menu ignores every CSS property, coming out ~1.4x the page font
- * with its own row heights and colours. Rendering the list in the DOM is the only way
- * to make dropdowns match the rest of the interface, and it also buys filtering and
- * grouping that native menus cannot express.
+ * Replaces the old bespoke dropdown: a native <select> is used nowhere because macOS
+ * renders its popup itself, ignoring every CSS property. cmdk renders the list in the
+ * DOM so it matches the rest of the interface and brings filtering, grouping, and
+ * keyboard navigation for free. The public API (options/value/onChange/action) is
+ * unchanged so every existing caller keeps working.
  */
 export function Select({
   options,
@@ -39,165 +58,139 @@ export function Select({
   actionLabel,
   onAction,
   ariaLabel,
-  className = '',
+  className,
+  allowCustom = false,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState('');
-  const [active, setActive] = useState(0);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const filterRef = useRef<HTMLInputElement>(null);
+  const [search, setSearch] = useState('');
 
-  const showFilter = options.length > FILTER_THRESHOLD;
-
-  const visible = useMemo(() => {
-    const query = filter.trim().toLowerCase();
-    if (!query) return options;
-    return options.filter((option) => option.label.toLowerCase().includes(query));
-  }, [options, filter]);
-
+  const showFilter = allowCustom || options.length > FILTER_THRESHOLD;
   const selected = options.find((option) => option.value === value) ?? null;
+  // Custom values aren't in `options` — still show them on the trigger.
+  const displayLabel = selected?.label ?? (allowCustom && value ? value : null);
 
-  // Close on outside click or Escape. Without this the panel survives clicks
-  // elsewhere on the page, which native selects handle for free.
-  useEffect(() => {
-    if (!open) return;
+  const trimmedSearch = search.trim();
+  const canCreate =
+    allowCustom &&
+    trimmedSearch.length > 0 &&
+    !options.some(
+      (option) =>
+        option.value.toLowerCase() === trimmedSearch.toLowerCase() ||
+        option.label.toLowerCase() === trimmedSearch.toLowerCase(),
+    );
 
-    function onPointerDown(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+  // Preserve source order while collecting each option under its (optional) group
+  // heading, so grouped and ungrouped options render the way callers pass them.
+  const groups = useMemo(() => {
+    const byGroup = new Map<string, SelectOption[]>();
+    for (const option of options) {
+      const key = option.group ?? '';
+      const bucket = byGroup.get(key);
+      if (bucket) bucket.push(option);
+      else byGroup.set(key, [option]);
     }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false);
-    }
+    return [...byGroup.entries()];
+  }, [options]);
 
-    document.addEventListener('mousedown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (open && showFilter) filterRef.current?.focus();
-  }, [open, showFilter]);
-
-  function choose(optionValue: string) {
-    onChange(optionValue);
+  function choose(next: string) {
+    onChange(next);
     setOpen(false);
-    setFilter('');
+    setSearch('');
   }
-
-  function onTriggerKeyDown(event: React.KeyboardEvent) {
-    if (!open && (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ')) {
-      event.preventDefault();
-      setOpen(true);
-      setActive(0);
-      return;
-    }
-    if (!open) return;
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      setActive((index) => Math.min(index + 1, visible.length - 1));
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setActive((index) => Math.max(index - 1, 0));
-    } else if (event.key === 'Enter') {
-      event.preventDefault();
-      const option = visible[active];
-      if (option) choose(option.value);
-    }
-  }
-
-  let lastGroup: string | undefined;
 
   return (
-    <div ref={rootRef} className={`select ${className}`}>
-      <button
-        type="button"
-        className={`select-trigger${selected ? '' : ' placeholder'}`}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={ariaLabel ?? placeholder}
-        onClick={() => setOpen((current) => !current)}
-        onKeyDown={onTriggerKeyDown}
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setSearch('');
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          aria-label={ariaLabel ?? placeholder}
+          className={cn(
+            'h-[34px] w-full justify-between px-2.5 font-normal',
+            !displayLabel && 'text-muted-foreground',
+            className,
+          )}
+        >
+          <span className="truncate">{displayLabel ?? placeholder}</span>
+          <ChevronDown className="text-muted-foreground opacity-70" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="w-[max(var(--radix-popover-trigger-width),200px)] p-0"
       >
-        <span className="select-value">{selected?.label ?? placeholder}</span>
-        <svg className="select-chevron" width="12" height="12" viewBox="0 0 12 12" aria-hidden>
-          <path
-            d="M2.5 4.5L6 8l3.5-3.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="select-panel" role="listbox">
+        <Command>
           {showFilter && (
-            <input
-              ref={filterRef}
-              className="select-filter"
-              value={filter}
-              placeholder="Filter…"
-              aria-label="Filter options"
-              onChange={(event) => {
-                setFilter(event.target.value);
-                setActive(0);
-              }}
-              onKeyDown={onTriggerKeyDown}
+            <CommandInput
+              placeholder={allowCustom ? 'Filter or type custom…' : 'Filter…'}
+              value={search}
+              onValueChange={setSearch}
             />
           )}
-
-          <div className="select-options">
-            {visible.length === 0 && <div className="select-empty">No matches</div>}
-
-            {visible.map((option, index) => {
-              const heading = option.group && option.group !== lastGroup ? option.group : null;
-              lastGroup = option.group;
-
-              return (
-                <div key={option.value}>
-                  {heading && <div className="select-group">{heading}</div>}
-                  <div
-                    role="option"
-                    aria-selected={option.value === value}
-                    className={`select-option${index === active ? ' active' : ''}${
-                      option.value === value ? ' selected' : ''
-                    }`}
-                    onMouseEnter={() => setActive(index)}
-                    onMouseDown={(event) => {
-                      // mousedown, not click: the outside-click handler fires first
-                      // on mousedown and would close the panel before click lands.
-                      event.preventDefault();
-                      choose(option.value);
+          <CommandList>
+            <CommandEmpty>{allowCustom ? 'Type a custom name' : 'No matches'}</CommandEmpty>
+            {groups.map(([heading, groupOptions]) => (
+              <CommandGroup key={heading || '_'} {...(heading ? { heading } : {})}>
+                {groupOptions.map((option) => (
+                  <CommandItem
+                    key={option.value}
+                    value={option.value}
+                    keywords={[option.label]}
+                    onSelect={choose}
+                  >
+                    <Check
+                      className={cn(
+                        'text-primary',
+                        option.value === value ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
+                    <span className="truncate">{option.label}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
+            {canCreate && (
+              <>
+                <CommandSeparator />
+                <CommandGroup>
+                  <CommandItem
+                    // Prefix keeps cmdk from filtering this row away while searching.
+                    value={`use-custom-${trimmedSearch}`}
+                    className="text-primary data-[selected=true]:text-primary"
+                    onSelect={() => choose(trimmedSearch)}
+                  >
+                    Use “{trimmedSearch}”
+                  </CommandItem>
+                </CommandGroup>
+              </>
+            )}
+            {actionLabel && onAction && (
+              <>
+                <CommandSeparator />
+                <CommandGroup>
+                  <CommandItem
+                    className="text-primary data-[selected=true]:text-primary"
+                    onSelect={() => {
+                      setOpen(false);
+                      setSearch('');
+                      onAction();
                     }}
                   >
-                    {option.label}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {actionLabel && onAction && (
-            <button
-              type="button"
-              className="select-action"
-              onMouseDown={(event) => {
-                event.preventDefault();
-                setOpen(false);
-                onAction();
-              }}
-            >
-              {actionLabel}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+                    {actionLabel}
+                  </CommandItem>
+                </CommandGroup>
+              </>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

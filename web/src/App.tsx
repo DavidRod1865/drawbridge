@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
+import { ArrowLeftRight, Building2, ChevronRight, FolderOpen, Home, LogOut, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LoginScreen } from './components/LoginScreen.tsx';
 import { ProjectPicker } from './components/ProjectPicker.tsx';
-import { DropZone } from './components/DropZone.tsx';
+import { AddDrawingDialog } from './components/AddDrawingDialog.tsx';
 import { ReviewTable } from './components/ReviewTable.tsx';
-import { CreatableSelect } from './components/CreatableSelect.tsx';
 import { DrawingAreaBrowser } from './components/DrawingAreaBrowser.tsx';
 import { AreaDrawings } from './components/AreaDrawings.tsx';
 import { UploadPanel } from './components/UploadPanel.tsx';
@@ -19,6 +23,11 @@ import {
   type UploadResult,
 } from './lib/upload.ts';
 import { normalizeSheetNumber } from './lib/sheetNumber.ts';
+import {
+  PENDING_DRAWING_SET_ID,
+  isPendingDrawingSetId,
+  resolveDrawingSetId,
+} from './lib/pendingDrawingSet.ts';
 import type { PlannedSheet } from './lib/validation.ts';
 import {
   createDrawing,
@@ -36,19 +45,31 @@ import {
   type Project,
 } from './lib/procore.ts';
 
+/** Local calendar date as YYYY-MM-DD — the default for a fresh upload batch. */
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
 export function App() {
   const { state, refresh, logout } = useAuth();
   const [selection, setSelection] = useState<{ company: Company; project: Project } | null>(null);
   const [areas, setAreas] = useState<DrawingArea[]>([]);
+  // Procore Drawing Sets only — never holds the session draft.
   const [sets, setSets] = useState<DrawingSet[]>([]);
   const [revisions, setRevisions] = useState<DrawingRevision[]>([]);
   // Drawing Set and Drawing Area are chosen once for the whole package rather than
   // per sheet: a package is uploaded into one set and one area in practice, and
   // repeating the choice on every row was pure friction.
   const [setId, setSetId] = useState<number | null>(null);
+  // Name for a set typed via "+ New" that has not been POSTed to Procore yet.
+  // Cleared on discard / project change; materialized in startUpload.
+  const [pendingSetName, setPendingSetName] = useState<string | null>(null);
   const [areaId, setAreaId] = useState<number | null>(null);
   const [projectError, setProjectError] = useState<string | null>(null);
   const [loadingProject, setLoadingProject] = useState(false);
+  // The "Add drawings" wizard (Drawing Set → upload). Opened from the area view.
+  const [addOpen, setAddOpen] = useState(false);
+  // Batch dates chosen in the wizard, stamped onto every new sheet (default today).
+  const [drawingDate, setDrawingDate] = useState(todayISO);
+  const [receivedDate, setReceivedDate] = useState(todayISO);
 
   // Upload run state. Progress is kept across attempts so a retry resumes rather than
   // restarting — re-running a completed sheet would duplicate it in Procore.
@@ -135,22 +156,87 @@ export function App() {
     }
   }, [areaId, sheets, revisions, updateSheets]);
 
-  // Procore requires a drawing_date on every import, and it's the one field carried
-  // through to the review. Prefill both dates with today; only blank fields are
-  // touched, so a user edit is never overwritten and the effect can't loop.
+  // Once parsing yields sheets, the wizard's job is done — close it so the review
+  // table (rendered underneath) takes over. The dialog only tracks its own step.
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    if (sheets.length > 0) setAddOpen(false);
+  }, [sheets.length]);
+
+  // Procore requires a drawing_date on every import. Stamp the wizard's chosen dates
+  // (defaulting to today) onto any sheet still missing them; only blank fields are
+  // touched, so a per-row edit in the review table is never overwritten and the effect
+  // can't loop. Empty strings are skipped so clearing a date leaves it genuinely blank.
+  useEffect(() => {
     const noDrawingDate = sheets.filter((s) => !s.drawingDate).map((s) => s.id);
     const noReceivedDate = sheets.filter((s) => !s.receivedDate).map((s) => s.id);
-    if (noDrawingDate.length > 0) updateSheets(noDrawingDate, { drawingDate: today });
-    if (noReceivedDate.length > 0) updateSheets(noReceivedDate, { receivedDate: today });
-  }, [sheets, updateSheets]);
+    if (drawingDate && noDrawingDate.length > 0) updateSheets(noDrawingDate, { drawingDate });
+    if (receivedDate && noReceivedDate.length > 0) updateSheets(noReceivedDate, { receivedDate });
+  }, [sheets, drawingDate, receivedDate, updateSheets]);
+
+  function clearPendingSet() {
+    setPendingSetName(null);
+    if (setId !== null && isPendingDrawingSetId(setId)) setSetId(null);
+  }
+
+  function handleSetChange(id: number) {
+    // Picking a real Procore set drops any unused draft so it cannot linger in the list.
+    if (!isPendingDrawingSetId(id)) setPendingSetName(null);
+    setSetId(id);
+  }
+
+  function handleAddOpenChange(open: boolean) {
+    setAddOpen(open);
+    // Cancelled without producing sheets: the draft never became a Procore set.
+    if (!open && sheets.length === 0) clearPendingSet();
+  }
+
+  /** Reset the in-project workspace to its landing (area browser), keeping the project. */
+  function returnHome() {
+    setAreaId(null);
+    setSetId(null);
+    setPendingSetName(null);
+    setDrawingDate(todayISO());
+    setReceivedDate(todayISO());
+    setUploadResult(null);
+    setUploadProgress(new Map());
+    setAddOpen(false);
+    pkg.reset();
+  }
+
+  /** Leave the project entirely — back to the picker to change company or project. */
+  function changeProject() {
+    returnHome();
+    setSelection(null);
+  }
 
   async function startUpload(previous?: ReadonlyMap<string, SheetProgress>) {
     if (!selection || setId === null || areaId === null) return;
 
     setUploading(true);
     setUploadResult(null);
+    setProjectError(null);
+
+    // Materialize a session-only draft in Procore before any bytes move. Failure here
+    // aborts cleanly — nothing has been uploaded yet.
+    let drawingSetId: number;
+    try {
+      const resolved = await resolveDrawingSetId({
+        setId,
+        pendingName: pendingSetName,
+        create: (name) => createDrawingSet(selection.project.id, name),
+      });
+      drawingSetId = resolved.id;
+      if (resolved.created) {
+        const created = resolved.created;
+        setSets((current) => [...current, created]);
+        setPendingSetName(null);
+        setSetId(created.id);
+      }
+    } catch (cause) {
+      setUploading(false);
+      setProjectError(cause instanceof Error ? cause.message : String(cause));
+      return;
+    }
 
     // Map each sheet that is a revision of a drawing already in Procore to that Drawing's
     // id, so the upload assigns the new revision directly (no OCR review) instead of
@@ -173,7 +259,7 @@ export function App() {
     const result = await runUpload(
       {
         projectId: selection.project.id,
-        drawingSetId: setId,
+        drawingSetId,
         drawingAreaId: areaId,
         sheets,
         existingDrawingIdBySheetId,
@@ -194,10 +280,17 @@ export function App() {
     setUploading(false);
   }
 
+  // Dropdown shows Procore sets plus the in-session draft (if any). The draft uses a
+  // sentinel id so CreatableSelect can select it without a Procore POST.
+  const setsForPicker: readonly DrawingSet[] =
+    pendingSetName === null
+      ? sets
+      : [...sets, { id: PENDING_DRAWING_SET_ID, name: pendingSetName }];
+
   if (state.status === 'loading') {
     return (
-      <main className="centered">
-        <p className="muted">Checking Procore session…</p>
+      <main className="blueprint-grid grid min-h-screen place-items-center p-6">
+        <p className="text-sm text-muted-foreground">Checking Procore session…</p>
       </main>
     );
   }
@@ -214,31 +307,61 @@ export function App() {
         : null;
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <span className="wordmark">Drawbridge</span>
-        {state.environment === 'sandbox' && <span className="badge">Sandbox</span>}
-        <div className="spacer" />
-        {selection && <span className="muted">{selection.project.name}</span>}
-        {selection && (
-          <button
-            className="button subtle"
-            onClick={() => {
-              setSelection(null);
-              setAreaId(null);
-              setSetId(null);
-              pkg.reset();
-            }}
+    <div className="blueprint-grid flex min-h-screen flex-col">
+      <header className="sticky top-0 z-20 flex items-center gap-3 border-b bg-card/90 px-4 py-2.5 backdrop-blur sm:px-6">
+        {/* App name — always visible. */}
+        <span className="font-heading text-lg font-semibold tracking-tight">Drawbridge</span>
+        {state.environment === 'sandbox' && (
+          <Badge
+            variant="secondary"
+            className="rounded-full font-mono text-[10px] tracking-[0.12em] uppercase"
           >
-            Change project
-          </button>
+            Sandbox
+          </Badge>
         )}
-        <button className="button subtle" onClick={() => void logout()}>
-          Sign out
-        </button>
+
+        {/* Where you are: Company › Project. */}
+        {selection && (
+          <>
+            <Separator orientation="vertical" className="mx-1 hidden h-5! sm:block" />
+            <div className="hidden min-w-0 items-center gap-1.5 text-sm sm:flex">
+              <Building2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="truncate text-muted-foreground">{selection.company.name}</span>
+              <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/50" aria-hidden />
+              <FolderOpen className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="max-w-[220px] truncate font-medium">{selection.project.name}</span>
+            </div>
+          </>
+        )}
+
+        <div className="flex-1" />
+
+        {selection && (
+          <>
+            <Button variant="ghost" size="sm" onClick={returnHome}>
+              <Home aria-hidden />
+              <span className="hidden sm:inline">Home</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={changeProject}>
+              <ArrowLeftRight aria-hidden />
+              <span className="hidden sm:inline">Change project</span>
+            </Button>
+            <Separator orientation="vertical" className="mx-0.5 h-5!" />
+          </>
+        )}
+        <Button variant="ghost" size="sm" onClick={() => void logout()}>
+          <LogOut aria-hidden />
+          <span className="hidden sm:inline">Sign out</span>
+        </Button>
       </header>
 
-      <main className="app-body">
+      <main
+        className={
+          sheets.length > 0 || uploading || uploadResult
+            ? 'grid w-full flex-1 content-start px-3 pt-4 pb-6'
+            : 'grid flex-1 content-start justify-items-center px-6 pt-6 pb-8'
+        }
+      >
         {!selection ? (
           <ProjectPicker
             onSelect={(company, project) => {
@@ -249,44 +372,27 @@ export function App() {
             onSessionLost={() => void refresh()}
           />
         ) : (
-          <div className="workspace">
+          <div
+            className={
+              sheets.length > 0 || uploading || uploadResult
+                ? 'grid w-full gap-4'
+                : 'grid w-full max-w-[1360px] gap-4'
+            }
+          >
             {projectError && (
-              <p className="error" role="alert">
-                {projectError}
-              </p>
+              <Alert variant="destructive">
+                <AlertDescription>{projectError}</AlertDescription>
+              </Alert>
             )}
 
-            {loadingProject && <p className="muted">Loading drawing areas and revisions…</p>}
-
-            {/* Area-first (per the concept workflow): the Set and Area are chosen before
-                any files are added, so revision/discipline seeding matches on the first
-                pass and the review screen is never shown against an unset area. */}
-            {!uploading && !uploadResult && (
-              <div className="package-bar">
-                <label className="inline">
-                  Drawing Set
-                  <CreatableSelect
-                    items={sets}
-                    value={setId}
-                    placeholder="Choose a set…"
-                    createLabel="+ New Drawing Set…"
-                    newLabel="New set name"
-                    onCreate={(name) => createDrawingSet(selection.project.id, name)}
-                    onChange={setSetId}
-                    onCreated={(set) => setSets((current) => [...current, set])}
-                  />
-                </label>
-
-                {sheets.length > 0 && (
-                  <span className="muted">Applied to all {sheets.length} sheets.</span>
-                )}
-              </div>
+            {loadingProject && (
+              <p className="text-sm text-muted-foreground">Loading drawing areas and revisions…</p>
             )}
 
-            {/* Browse the project's Drawing Areas and see what each already holds before
-                choosing one. Selecting an area also targets it for upload (the area-fanout
-                effect stamps it onto every sheet), so browse and pick are one action. Only
-                shown pre-upload; once files are added the ReviewTable takes over. */}
+            {/* Area-first (per the concept workflow): the Area is chosen before any files
+                are added, so revision/discipline seeding matches on the first pass and the
+                review screen is never shown against an unset area. The Drawing Set and the
+                upload now live in the "Add drawings" wizard, opened from here. */}
             {!uploading && !uploadResult && sheets.length === 0 && (
               <>
                 <DrawingAreaBrowser
@@ -296,43 +402,41 @@ export function App() {
                   onCreate={(name) => createDrawingArea(selection.project.id, name)}
                   onCreated={(area) => setAreas((current) => [...current, area])}
                 />
-                {areaId !== null && (
-                  <AreaDrawings revisions={revisions} sets={sets} areaId={areaId} />
+                {areaId !== null ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <h2 className="font-heading text-sm font-semibold tracking-tight">
+                        Drawings in this area
+                      </h2>
+                      <Button onClick={() => setAddOpen(true)}>
+                        <Plus />
+                        Add drawing
+                      </Button>
+                    </div>
+                    <AreaDrawings revisions={revisions} sets={sets} areaId={areaId} />
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Choose a Drawing Area to see its drawings and add new ones.
+                  </p>
                 )}
               </>
             )}
 
-            {sheets.length === 0 &&
-              !uploading &&
-              !uploadResult &&
-              (setId === null || areaId === null ? (
-                <p className="muted">Choose a Drawing Set and Drawing Area, then add your drawings.</p>
-              ) : (
-                <DropZone
-                  onFiles={(files) => void pkg.addFiles(files)}
-                  disabled={loadingProject || pkg.progress !== null}
-                />
-              ))}
-
-            {pkg.progress && (
-              <p className="muted">
-                Parsing {pkg.progress.done + 1} of {pkg.progress.total}: {pkg.progress.current}
-              </p>
-            )}
-
             {pkg.problems.length > 0 && (
-              <div className="error" role="alert">
-                {pkg.problems.map((problem) => (
-                  <div key={problem.file}>
-                    <strong>{problem.file}</strong>: {problem.message}
-                  </div>
-                ))}
-              </div>
+              <Alert variant="destructive">
+                <AlertDescription className="grid gap-1">
+                  {pkg.problems.map((problem) => (
+                    <div key={problem.file}>
+                      <strong>{problem.file}</strong>: {problem.message}
+                    </div>
+                  ))}
+                </AlertDescription>
+              </Alert>
             )}
 
             {(uploading || uploadResult) && (
               <UploadPanel
-                projectId={selection.project.id}
                 sheets={sheets}
                 progress={uploadProgress}
                 result={uploadResult}
@@ -346,6 +450,8 @@ export function App() {
                 onDone={() => {
                   setUploadResult(null);
                   setUploadProgress(new Map());
+                  setDrawingDate(todayISO());
+                  setReceivedDate(todayISO());
                   pkg.reset();
                 }}
               />
@@ -356,10 +462,47 @@ export function App() {
                 sheets={sheets}
                 existingRevisions={revisions}
                 blockedReason={uploadBlocker}
+                drawingSetName={setsForPicker.find((set) => set.id === setId)?.name ?? null}
+                drawingAreaName={areas.find((area) => area.id === areaId)?.name ?? null}
                 onUpdate={updateSheets}
                 onUpload={() => void startUpload()}
               />
             )}
+
+            <AddDrawingDialog
+              open={addOpen}
+              onOpenChange={handleAddOpenChange}
+              sets={setsForPicker}
+              setId={setId}
+              onSetChange={handleSetChange}
+              onCreateSet={async (name) => {
+                // Prefer an existing Procore match over a twin draft — CreatableSelect
+                // already checks items, but setsForPicker may only hold the prior draft.
+                const existing = sets.find(
+                  (set) => set.name.trim().toLowerCase() === name.trim().toLowerCase(),
+                );
+                if (existing) return existing;
+
+                setPendingSetName(name);
+                return { id: PENDING_DRAWING_SET_ID, name };
+              }}
+              onCreatedSet={(set) => {
+                // Real Procore sets (matched above) join the list; the pending sentinel
+                // is already exposed via setsForPicker / pendingSetName.
+                if (!isPendingDrawingSetId(set.id)) {
+                  setSets((current) =>
+                    current.some((s) => s.id === set.id) ? current : [...current, set],
+                  );
+                }
+              }}
+              drawingDate={drawingDate}
+              receivedDate={receivedDate}
+              onDrawingDateChange={setDrawingDate}
+              onReceivedDateChange={setReceivedDate}
+              onFiles={(files) => void pkg.addFiles(files)}
+              parsing={pkg.progress}
+              problems={pkg.problems}
+            />
           </div>
         )}
       </main>

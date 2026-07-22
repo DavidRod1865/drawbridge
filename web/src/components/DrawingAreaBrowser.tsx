@@ -1,4 +1,9 @@
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import type { DrawingArea } from '../lib/procore.ts';
 
 interface Props {
@@ -57,52 +62,71 @@ export function DrawingAreaBrowser({ areas, selectedAreaId, onSelect, onCreate, 
   }
 
   return (
-    <section className="card area-card">
-      <div className="area-card-head">Drawing Area</div>
-
-      <div className="area-list">
-        {areas.map((area) => (
-          <button
-            key={area.id}
-            type="button"
-            className={`area-item${area.id === selectedAreaId ? ' active' : ''}`}
-            onClick={() => onSelect(area.id)}
+    <Card className="gap-3 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase">
+          Drawing Area
+        </span>
+        {creating ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Input
+              className="h-8 w-[160px]"
+              autoFocus
+              placeholder="New area name"
+              value={name}
+              disabled={busy}
+              onChange={(event) => setName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void submit();
+                if (event.key === 'Escape') reset();
+              }}
+            />
+            <Button variant="outline" size="sm" disabled={busy} onClick={() => void submit()}>
+              {busy ? 'Creating…' : 'Create'}
+            </Button>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={reset}>
+              Cancel
+            </Button>
+            {error && <span className="w-full text-xs text-destructive">{error}</span>}
+          </div>
+        ) : (
+          <Button
+            size="sm"
+            className="border-primary/40 bg-primary/5 text-primary hover:bg-primary hover:text-primary-foreground"
+            variant="outline"
+            onClick={() => setCreating(true)}
           >
-            {area.name}
-          </button>
-        ))}
-        {areas.length === 0 && !creating && (
-          <span className="muted">No drawing areas yet — create one to get started.</span>
+            <Plus />
+            New Drawing Area
+          </Button>
         )}
       </div>
 
-      {creating ? (
-        <div className="inline-create">
-          <input
-            className="cell-input"
-            autoFocus
-            placeholder="New area name"
-            value={name}
-            disabled={busy}
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void submit();
-              if (event.key === 'Escape') reset();
-            }}
-          />
-          <button className="button subtle tiny" disabled={busy} onClick={() => void submit()}>
-            {busy ? 'Creating…' : 'Create'}
-          </button>
-          <button className="button subtle tiny" disabled={busy} onClick={reset}>
-            Cancel
-          </button>
-          {error && <div className="issue blocking">{error}</div>}
-        </div>
-      ) : (
-        <button className="button subtle" onClick={() => setCreating(true)}>
-          + New drawing area
-        </button>
-      )}
-    </section>
+      <div className="flex flex-wrap gap-2">
+        {areas.map((area) => {
+          const active = area.id === selectedAreaId;
+          return (
+            <button
+              key={area.id}
+              type="button"
+              className={cn(
+                'rounded-md border px-3 py-1.5 text-[13px] transition-colors',
+                active
+                  ? 'border-primary bg-primary/10 font-semibold text-primary'
+                  : 'border-input bg-card hover:border-muted-foreground/60',
+              )}
+              onClick={() => onSelect(area.id)}
+            >
+              {area.name}
+            </button>
+          );
+        })}
+        {areas.length === 0 && !creating && (
+          <span className="text-sm text-muted-foreground">
+            No drawing areas yet — create one to get started.
+          </span>
+        )}
+      </div>
+    </Card>
   );
 }

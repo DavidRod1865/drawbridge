@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Select } from './Select.tsx';
+import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { NotAuthenticatedError } from '../lib/api.ts';
 import { listCompanies, listProjects, type Company, type Project } from '../lib/procore.ts';
 
@@ -60,26 +63,26 @@ export function ProjectPicker({ onSelect, onSessionLost }: Props) {
           : 'Choose a project';
 
   return (
-    <section className="card">
-      <h2>Select a project</h2>
+    <Card className="w-full max-w-md gap-5 p-6">
+      <h2 className="font-heading text-lg font-semibold tracking-tight">Select a project</h2>
       {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      <label className="stacked">
-        Company
+      <div className="grid gap-1.5">
+        <Label>Company</Label>
         <Select
           options={companies.map((item) => ({ value: String(item.id), label: item.name }))}
           value={companyId === null ? null : String(companyId)}
           placeholder={loading && companies.length === 0 ? 'Loading…' : 'Choose a company'}
           onChange={(value) => setCompanyId(Number(value))}
         />
-      </label>
+      </div>
 
-      <label className="stacked">
-        Project
+      <div className="grid gap-1.5">
+        <Label>Project</Label>
         <Select
           // Project numbers are how people actually refer to jobs, so lead with them.
           options={projects.map((project) => ({
@@ -95,7 +98,7 @@ export function ProjectPicker({ onSelect, onSessionLost }: Props) {
             if (project && company) onSelect(company, project);
           }}
         />
-      </label>
-    </section>
+      </div>
+    </Card>
   );
 }

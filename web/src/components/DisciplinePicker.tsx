@@ -1,49 +1,26 @@
 import { useState } from 'react';
-import { Select } from './Select.tsx';
-import { optionsFor, type DisciplineMode } from '../lib/disciplines.ts';
+import { DisciplineField } from './DisciplineField.tsx';
 
 interface Props {
   onPick: (value: string) => void;
 }
 
 /**
- * Bulk discipline setter: choose the vocabulary, then type or pick a value.
- *
- * The value field is a filtering combobox rather than a dropdown because the floor
- * list runs past a hundred entries — a native menu that long covers the screen and
- * cannot be constrained with CSS. Choosing the mode first also narrows what the
- * suggestions contain, so 'Floor 5' and 'Fire Protection' never compete.
+ * Bulk discipline setter — same DisciplineField as each row, so the menu, filter,
+ * and custom-name path stay identical whether you're editing one sheet or many.
  */
 export function DisciplinePicker({ onPick }: Props) {
-  const [mode, setMode] = useState<DisciplineMode>('standard');
+  const [value, setValue] = useState<string | null>(null);
 
   return (
-    <span className="discipline-picker">
-      <Select
-        className="mode"
-        ariaLabel="Discipline type"
-        options={[
-          { value: 'standard', label: 'Discipline' },
-          { value: 'floor', label: 'Floor' },
-        ]}
-        value={mode}
-        onChange={(value) => setMode(value as DisciplineMode)}
-      />
-
-      <input
-        className="bulk-input"
-        list={`bulk-${mode}-options`}
-        placeholder={mode === 'floor' ? 'Set floor…' : 'Set discipline…'}
-        onBlur={(event) => {
-          if (event.target.value) onPick(event.target.value);
+    <div className="w-[170px]">
+      <DisciplineField
+        value={value}
+        onChange={(next) => {
+          setValue(next);
+          onPick(next);
         }}
       />
-
-      <datalist id={`bulk-${mode}-options`}>
-        {optionsFor(mode).map((option) => (
-          <option key={option} value={option} />
-        ))}
-      </datalist>
-    </span>
+    </div>
   );
 }

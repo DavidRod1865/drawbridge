@@ -5,7 +5,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import { App } from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { configurePdfWorker } from './lib/pdf.ts';
-import './styles.css';
+import './index.css';
 
 configurePdfWorker(pdfWorkerUrl);
 
