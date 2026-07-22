@@ -77,8 +77,12 @@ async function expectArray<T>(what: string, promise: Promise<T[]>): Promise<T[]>
 
 export const listCompanies = () => expectArray('companies', procore<Company[]>('v1.0/companies'));
 
+// List Projects lives at v1.1 — Procore retired the v1.0 collection route (it returns a
+// generic 404 "Item not found" even with a valid Procore-Company-Id header), while the
+// v1.0 *member* route (projects/{id}) still exists. Company is supplied via both the
+// Procore-Company-Id header (set on company selection) and the legacy query param.
 export const listProjects = (companyId: number) =>
-  expectArray('projects', procore<Project[]>(`v1.0/projects?company_id=${companyId}`));
+  expectArray('projects', procore<Project[]>(`v1.1/projects?company_id=${companyId}`));
 
 export const listDrawingAreas = (projectId: number) =>
   expectArray(
