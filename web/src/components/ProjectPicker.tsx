@@ -3,7 +3,7 @@ import { Select } from './Select.tsx';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { NotAuthenticatedError } from '../lib/api.ts';
+import { NotAuthenticatedError, setCompanyId as rememberCompanyForApi } from '../lib/api.ts';
 import { listCompanies, listProjects, type Company, type Project } from '../lib/procore.ts';
 
 interface Props {
@@ -43,6 +43,13 @@ export function ProjectPicker({ onSelect, onSessionLost }: Props) {
 
   useEffect(() => {
     if (companyId === null) return;
+    // Attach the Procore-Company-Id header before the first company-scoped call.
+    // Procore identifies company-scoped requests (listing projects included) by this
+    // header, not the ?company_id query param alone — production returns 404
+    // "Item not found" without it. This is what api.ts intends by "set once when the
+    // user picks a company"; setting it only on project selection was too late, since
+    // listProjects runs first.
+    rememberCompanyForApi(companyId);
     setLoading(true);
     setProjects([]);
     listProjects(companyId)
