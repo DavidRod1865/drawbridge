@@ -261,6 +261,11 @@ export function SheetPreviewDialog({
   function onPointerDown(event: React.PointerEvent) {
     const el = scrollRef.current;
     if (!el) return;
+    // Don't hijack presses on the overlay zoom controls. setPointerCapture would otherwise
+    // redirect the resulting click to this container, so the zoom buttons never fire.
+    if ((event.target as HTMLElement).closest('button')) return;
+    // Left button only — right-click / middle-click shouldn't start a pan.
+    if (event.button !== 0) return;
     drag.current = { x: event.clientX, y: event.clientY, left: el.scrollLeft, top: el.scrollTop };
     el.setPointerCapture(event.pointerId);
   }
@@ -325,31 +330,38 @@ export function SheetPreviewDialog({
         </DialogDescription>
 
         <div className="flex min-h-0 flex-1">
-          {/* Canvas stage: native scroll pans, drag pans, Ctrl+wheel zooms. */}
-          <div
-            ref={scrollRef}
-            className="relative min-w-0 flex-1 cursor-grab overflow-auto bg-muted/40 active:cursor-grabbing"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-          >
-            {error ? (
-              <div className="grid h-full place-items-center p-6">
-                <div className="flex max-w-sm flex-col items-center gap-2 text-center">
-                  <AlertTriangle className="size-6 text-muted-foreground" aria-hidden />
-                  <p className="text-sm text-muted-foreground">{error}</p>
+          {/*
+           * Canvas stage. The scroll container sits absolutely inside this non-scrolling
+           * cell so the overlaid hint and zoom controls anchor to the *visible* stage.
+           * Nested inside the scroll container they anchored to its scrollHeight and — since
+           * this preview opens scrolled to the bottom-right title block — sat far off-screen.
+           */}
+          <div className="relative min-w-0 flex-1 bg-muted/40">
+            <div
+              ref={scrollRef}
+              className="absolute inset-0 cursor-grab overflow-auto active:cursor-grabbing"
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+            >
+              {error ? (
+                <div className="grid h-full place-items-center p-6">
+                  <div className="flex max-w-sm flex-col items-center gap-2 text-center">
+                    <AlertTriangle className="size-6 text-muted-foreground" aria-hidden />
+                    <p className="text-sm text-muted-foreground">{error}</p>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="grid min-h-full place-items-center p-4">
-                {/* select-none so dragging to pan never starts a text selection. */}
-                <canvas
-                  ref={canvasRef}
-                  className="max-w-none rounded-sm bg-white shadow-md select-none"
-                />
-              </div>
-            )}
+              ) : (
+                <div className="grid min-h-full place-items-center p-4">
+                  {/* select-none so dragging to pan never starts a text selection. */}
+                  <canvas
+                    ref={canvasRef}
+                    className="max-w-none rounded-sm bg-white shadow-md select-none"
+                  />
+                </div>
+              )}
+            </div>
 
             {loading && !error && (
               <div className="pointer-events-none absolute inset-0 grid place-items-center">
@@ -357,29 +369,36 @@ export function SheetPreviewDialog({
               </div>
             )}
 
-            {/* Zoom controls float over the stage, bottom-center. */}
             {!error && (
-              <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-lg border bg-card/95 p-1 shadow-sm backdrop-blur">
-                <Button variant="ghost" size="icon-sm" onClick={zoomOut} aria-label="Zoom out">
-                  <ZoomOut />
-                </Button>
-                <span className="w-12 text-center text-xs tabular-nums text-muted-foreground">
-                  {zoomPercent}%
-                </span>
-                <Button variant="ghost" size="icon-sm" onClick={zoomIn} aria-label="Zoom in">
-                  <ZoomIn />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={fitWidth}
-                  aria-label="Fit width"
-                  className="gap-1.5"
-                >
-                  <Maximize2 />
-                  Fit
-                </Button>
-              </div>
+              <>
+                {/* How to drive the viewer — mouse/keyboard aren't discoverable on their own. */}
+                <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-full border bg-card/95 px-3 py-1 text-[11px] whitespace-nowrap text-muted-foreground shadow-sm backdrop-blur">
+                  Drag to pan · Ctrl/⌘ + scroll to zoom · ← → to change sheet
+                </div>
+
+                {/* Zoom controls, pinned bottom-center of the stage so they never scroll away. */}
+                <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-lg border bg-card/95 p-1 shadow-sm backdrop-blur">
+                  <Button variant="ghost" size="icon-sm" onClick={zoomOut} aria-label="Zoom out">
+                    <ZoomOut />
+                  </Button>
+                  <span className="w-12 text-center text-xs tabular-nums text-muted-foreground">
+                    {zoomPercent}%
+                  </span>
+                  <Button variant="ghost" size="icon-sm" onClick={zoomIn} aria-label="Zoom in">
+                    <ZoomIn />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={fitWidth}
+                    aria-label="Fit width"
+                    className="gap-1.5"
+                  >
+                    <Maximize2 />
+                    Fit
+                  </Button>
+                </div>
+              </>
             )}
           </div>
 

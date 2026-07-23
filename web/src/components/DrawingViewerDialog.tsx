@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, ChevronLeft, ChevronRight, Loader2, Maximize2, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
@@ -37,6 +37,7 @@ export function DrawingViewerDialog({ projectId, rows, index, onIndexChange, onC
   const row = rows[index];
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<ResizeObserver | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   // Set on each sheet load, cleared after the first paint positions the view at the
   // title block — so later zooming never re-jumps the scroll.
@@ -56,14 +57,21 @@ export function DrawingViewerDialog({ projectId, rows, index, onIndexChange, onC
   }, [row?.id]);
 
   // Track the scroll container's width so "fit" always fills it, even on window resize.
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
+  // A callback ref (not a mount-time effect) does the wiring: Radix mounts the dialog's
+  // content through <Presence>, which can attach this node on a later commit than the
+  // component's first render. A one-shot layout effect would run while the ref is still
+  // null, bail out, and — with an empty dep array — never retry, leaving viewportWidth
+  // pinned at 0 (the image then renders at its natural ~6400px). The callback runs the
+  // instant the node actually attaches, and the observer self-corrects if that first
+  // read lands before layout.
+  const attachScroll = useCallback((el: HTMLDivElement | null) => {
+    scrollRef.current = el;
+    observerRef.current?.disconnect();
     if (!el) return;
-    const measure = () => setViewportWidth(el.clientWidth);
-    measure();
-    const observer = new ResizeObserver(measure);
+    setViewportWidth(el.clientWidth);
+    const observer = new ResizeObserver(() => setViewportWidth(el.clientWidth));
     observer.observe(el);
-    return () => observer.disconnect();
+    observerRef.current = observer;
   }, []);
 
   // Width the image is drawn at: fills the container at zoom 1, scales from there.
@@ -187,7 +195,7 @@ export function DrawingViewerDialog({ projectId, rows, index, onIndexChange, onC
          */}
         <div className="relative min-h-0 flex-1 bg-muted/40">
           <div
-            ref={scrollRef}
+            ref={attachScroll}
             className="absolute inset-0 cursor-grab overflow-auto active:cursor-grabbing"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
