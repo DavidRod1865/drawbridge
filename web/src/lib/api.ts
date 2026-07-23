@@ -155,5 +155,10 @@ export function drawingAssetUrl(
   revisionId: number,
   kind: DrawingAssetKind,
 ): string {
-  return `/api/drawings/${projectId}/${revisionId}/${kind}`;
+  // Carry the company id in the URL: an <img> request can't send the Procore-Company-Id
+  // header that apiFetch attaches, and Procore's project-scoped reads 404 without it. The
+  // server reads this param and sets the header on its behalf.
+  const companyId = getCompanyId();
+  const query = companyId !== null ? `?company=${companyId}` : '';
+  return `/api/drawings/${projectId}/${revisionId}/${kind}${query}`;
 }

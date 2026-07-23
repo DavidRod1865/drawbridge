@@ -85,7 +85,10 @@ async function fetchAsset(startUrl: string, bearer: string) {
 }
 
 export async function drawingRoutes(app: FastifyInstance): Promise<void> {
-  app.get<{ Params: { projectId: string; revisionId: string; kind: string } }>(
+  app.get<{
+    Params: { projectId: string; revisionId: string; kind: string };
+    Querystring: { company?: string };
+  }>(
     '/api/drawings/:projectId/:revisionId/:kind',
     async (request, reply) => {
       const { projectId, revisionId, kind } = request.params;
@@ -100,14 +103,23 @@ export async function drawingRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(401).send({ error: 'not_authenticated' });
       }
 
-      // Hop 1: read the revision to get its signed asset URL. drawing_revisions is a read
-      // endpoint, which tolerates a missing Procore-Company-Id header, so we don't need
-      // the company id here — the <img> request that hits this route can't set headers.
+      // Hop 1: read the revision to get its signed asset URL. Procore's project-scoped
+      // reads 404 without a Procore-Company-Id header. An <img> request can't send that
+      // header, so the client passes the company id in the query string and we set it here
+      // (validated to a positive integer, so the value can't inject a header).
+      const revisionHeaders: Record<string, string> = {
+        authorization: `Bearer ${session.accessToken}`,
+      };
+      const companyId = Number(request.query.company);
+      if (Number.isInteger(companyId) && companyId > 0) {
+        revisionHeaders['Procore-Company-Id'] = String(companyId);
+      }
+
       const revisionUrl =
         `${config.procore.apiHost}/rest/v1.0/projects/${projectId}` +
         `/drawing_revisions/${revisionId}`;
       const revisionResponse = await undiciRequest(revisionUrl, {
-        headers: { authorization: `Bearer ${session.accessToken}` },
+        headers: revisionHeaders,
       });
 
       if (revisionResponse.statusCode >= 400) {
