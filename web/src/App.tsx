@@ -80,7 +80,7 @@ export function App() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
 
   const pkg = usePackage();
-  const { sheets, updateSheets } = pkg;
+  const { sheets, updateSheets, removeSheets } = pkg;
 
   useEffect(() => {
     if (!selection) return;
@@ -425,7 +425,12 @@ export function App() {
                         Add drawing
                       </Button>
                     </div>
-                    <AreaDrawings revisions={revisions} sets={sets} areaId={areaId} />
+                    <AreaDrawings
+                      projectId={selection.project.id}
+                      revisions={revisions}
+                      sets={sets}
+                      areaId={areaId}
+                    />
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground">
@@ -478,6 +483,7 @@ export function App() {
                 drawingSetName={setsForPicker.find((set) => set.id === setId)?.name ?? null}
                 drawingAreaName={areas.find((area) => area.id === areaId)?.name ?? null}
                 onUpdate={updateSheets}
+                onRemove={removeSheets}
                 onUpload={() => void startUpload()}
               />
             )}

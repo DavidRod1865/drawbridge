@@ -55,6 +55,19 @@ export interface DrawingRevision {
   drawing_date: string;
   /** Plain `yyyy-mm-dd`, as returned by GET — not an ISO datetime. */
   received_date: string;
+  // Procore-hosted renders of the sheet, returned inline on every revision (list and
+  // show alike). They are short-lived *signed* URLs on Procore's File Access Service
+  // (`*.procore.com/fas/...`) — self-authenticating, but the FAS host blocks cross-origin
+  // reads, so the browser can't load them directly; they are streamed same-origin via the
+  // server's /api/drawings asset route. Optional because create/PATCH responses may omit
+  // them until Procore has finished rasterizing.
+  /** Full-resolution PNG raster of the sheet — what the viewer displays. */
+  png_url?: string;
+  /** The original PDF. */
+  pdf_url?: string;
+  /** Small and large preview rasters, handy for row thumbnails. */
+  thumbnail_url?: string;
+  large_thumbnail_url?: string;
 }
 
 /**

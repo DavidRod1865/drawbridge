@@ -11,11 +11,19 @@ import {
 import { cn } from '@/lib/utils';
 import type { DrawingRevision, DrawingSet } from '../lib/procore.ts';
 import { groupCurrentByDiscipline, type DisciplineGroup } from './areaGrouping.ts';
+import { DrawingViewerDialog } from './DrawingViewerDialog.tsx';
 
 interface Props {
+  projectId: number;
   revisions: readonly DrawingRevision[];
   sets: readonly DrawingSet[];
   areaId: number;
+}
+
+/** The open sheet, held as the discipline group being viewed plus the row within it. */
+interface Viewing {
+  rows: readonly DrawingRevision[];
+  index: number;
 }
 
 /**
@@ -41,7 +49,7 @@ function hueFor(discipline: string): string {
 }
 
 /** Read-only view of what a Drawing Area already holds, one table per discipline. */
-export function AreaDrawings({ revisions, sets, areaId }: Props) {
+export function AreaDrawings({ projectId, revisions, sets, areaId }: Props) {
   const groups = useMemo(() => groupCurrentByDiscipline(revisions, areaId), [revisions, areaId]);
 
   // A revision only carries its drawing_set.id, so resolve the human name here.
@@ -51,6 +59,9 @@ export function AreaDrawings({ revisions, sets, areaId }: Props) {
     return byId;
   }, [sets]);
 
+  // Which sheet is open in the viewer, if any. Paging stays within one discipline group.
+  const [viewing, setViewing] = useState<Viewing | null>(null);
+
   if (groups.length === 0) {
     return <p className="text-sm text-muted-foreground">No drawings in this area yet.</p>;
   }
@@ -58,8 +69,23 @@ export function AreaDrawings({ revisions, sets, areaId }: Props) {
   return (
     <div className="grid gap-3">
       {groups.map((group) => (
-        <DisciplineTable key={group.discipline} group={group} setNameById={setNameById} />
+        <DisciplineTable
+          key={group.discipline}
+          group={group}
+          setNameById={setNameById}
+          onOpen={(index) => setViewing({ rows: group.rows, index })}
+        />
       ))}
+
+      {viewing && (
+        <DrawingViewerDialog
+          projectId={projectId}
+          rows={viewing.rows}
+          index={viewing.index}
+          onIndexChange={(index) => setViewing((current) => (current ? { ...current, index } : current))}
+          onClose={() => setViewing(null)}
+        />
+      )}
     </div>
   );
 }
@@ -71,9 +97,12 @@ export function AreaDrawings({ revisions, sets, areaId }: Props) {
 function DisciplineTable({
   group,
   setNameById,
+  onOpen,
 }: {
   group: DisciplineGroup;
   setNameById: ReadonlyMap<number, string>;
+  /** Opens the viewer at the given row index within this group. */
+  onOpen: (index: number) => void;
 }) {
   const [open, setOpen] = useState(true);
   const hue = hueFor(group.discipline);
@@ -116,9 +145,24 @@ function DisciplineTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {group.rows.map((row) => (
-                <TableRow key={row.id} className="hover:bg-muted">
-                  <TableCell className="font-mono text-[13px]">{row.number}</TableCell>
+              {group.rows.map((row, index) => (
+                <TableRow
+                  key={row.id}
+                  className="cursor-pointer hover:bg-muted"
+                  // Row click opens the sheet — the whole row is the target so there's a
+                  // generous hit area, matching how the log reads as a list of sheets.
+                  onClick={() => onOpen(index)}
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onOpen(index);
+                    }
+                  }}
+                >
+                  <TableCell className="font-mono text-[13px] text-primary underline-offset-2 hover:underline">
+                    {row.number}
+                  </TableCell>
                   <TableCell className="break-words">{row.title}</TableCell>
                   <TableCell>{row.revision_number || '—'}</TableCell>
                   <TableCell className="break-words">{setNameById.get(row.drawing_set.id) ?? '—'}</TableCell>

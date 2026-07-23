@@ -141,3 +141,19 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 export function procore<T>(path: string, options?: RequestOptions): Promise<T> {
   return apiFetch<T>(`/api/procore/${path}`, options);
 }
+
+/** Renders a Procore drawing revision exposes, streamed same-origin (see server route). */
+export type DrawingAssetKind = 'png' | 'pdf' | 'thumbnail' | 'large_thumbnail';
+
+/**
+ * Same-origin URL for a drawing revision's render. Usable directly as an <img> src: the
+ * server fetches the revision, follows the signed Procore File Service URL, and streams
+ * the bytes back — the browser can't reach that host cross-origin itself.
+ */
+export function drawingAssetUrl(
+  projectId: number,
+  revisionId: number,
+  kind: DrawingAssetKind,
+): string {
+  return `/api/drawings/${projectId}/${revisionId}/${kind}`;
+}

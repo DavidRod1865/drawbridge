@@ -100,6 +100,20 @@ export function usePackage() {
     );
   }, []);
 
+  /**
+   * Drops the given sheets from the package before upload — the user's escape hatch for a
+   * page they didn't mean to include. Purely local: nothing has reached Procore yet, and
+   * re-adding the source file brings the page back.
+   *
+   * The File handle is pruned alongside the sheet. Keys are per page (`filename#pageIndex`),
+   * so deleting one never disturbs another page of the same source PDF.
+   */
+  const removeSheets = useCallback((ids: readonly string[]) => {
+    const target = new Set(ids);
+    for (const id of target) filesById.current.delete(id);
+    setSheets((existing) => existing.filter((sheet) => !target.has(sheet.id)));
+  }, []);
+
   const reset = useCallback(() => {
     filesById.current.clear();
     setSheets([]);
@@ -107,5 +121,5 @@ export function usePackage() {
     setProgress(null);
   }, []);
 
-  return { sheets, problems, progress, addFiles, updateSheets, reset, filesById };
+  return { sheets, problems, progress, addFiles, updateSheets, removeSheets, reset, filesById };
 }

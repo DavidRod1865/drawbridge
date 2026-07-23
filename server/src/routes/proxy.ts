@@ -38,7 +38,7 @@ function forwardBody(body: unknown): Buffer | string | null {
  * Returns a usable session, refreshing and re-issuing the cookie if needed.
  * Returns null when there is no session at all, or the refresh token is spent.
  */
-async function ensureFreshSession(
+export async function ensureFreshSession(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<Session | null> {

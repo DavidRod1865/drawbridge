@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, Eye, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, Eye, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { DisciplinePicker } from './DisciplinePicker.tsx';
 import { DisciplineField } from './DisciplineField.tsx';
 import { SheetPreviewDialog } from './SheetPreviewDialog.tsx';
@@ -26,6 +26,8 @@ interface Props {
   /** Source file handles, keyed by sheet id, for rendering the preview. */
   files: ReadonlyMap<string, File>;
   onUpdate: (ids: readonly string[], patch: Partial<PlannedSheet>) => void;
+  /** Drops sheets from the package before upload — the user's "didn't mean to add this" fix. */
+  onRemove: (ids: readonly string[]) => void;
   /** An upload-level blocker outside per-sheet validation, e.g. no Drawing Set chosen. */
   blockedReason?: string | null;
   /** Destination shown in the header so the user sees where these sheets are going. */
@@ -60,6 +62,7 @@ export function ReviewTable({
   existingRevisions,
   files,
   onUpdate,
+  onRemove,
   blockedReason,
   drawingSetName,
   drawingAreaName,
@@ -69,6 +72,25 @@ export function ReviewTable({
   const [bulkOpen, setBulkOpen] = useState(false);
   // Index of the sheet open in the preview dialog; -1 when closed.
   const [previewIndex, setPreviewIndex] = useState(-1);
+
+  /**
+   * Removes sheets, then repairs the table's own view state so nothing dangles: the
+   * selection can't keep ids that no longer exist, and an open preview pointed at (or past)
+   * a removed row would otherwise index into a shorter list. Closing it is the safe choice.
+   */
+  function removeSheets(ids: readonly string[]) {
+    if (ids.length === 0) return;
+    const removed = new Set(ids);
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const id of removed) next.delete(id);
+      return next;
+    });
+    if (previewIndex >= 0 && (removed.has(sheets[previewIndex]?.id ?? '') || sheets.length - ids.length <= previewIndex)) {
+      setPreviewIndex(-1);
+    }
+    onRemove(ids);
+  }
 
   const verdicts = useMemo(
     () => validateSheets(sheets, existingRevisions),
@@ -133,29 +155,43 @@ export function ReviewTable({
               <StatusBadge tone="blocked">{summary.blocked} needs fix</StatusBadge>
             )}
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            aria-expanded={bulkOpen}
-            aria-controls="review-bulk-edit"
-            className={cn(
-              'h-7 gap-1.5 rounded-md px-2 font-medium text-muted-foreground',
-              'hover:bg-muted hover:text-foreground',
-              bulkOpen && 'bg-muted text-foreground',
+          <div className="flex items-center gap-1">
+            {selectedIds.length > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                className="h-7 gap-1.5 rounded-md px-2 font-medium text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => removeSheets(selectedIds)}
+              >
+                <Trash2 data-icon="inline-start" />
+                Remove {selectedIds.length}
+              </Button>
             )}
-            onClick={() => setBulkOpen((open) => !open)}
-          >
-            <SlidersHorizontal data-icon="inline-start" />
-            {bulkOpen ? 'Hide bulk edit' : 'Bulk edit'}
-            <ChevronDown
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              aria-expanded={bulkOpen}
+              aria-controls="review-bulk-edit"
               className={cn(
-                'size-3.5 opacity-60 transition-transform duration-200',
-                bulkOpen && 'rotate-180',
+                'h-7 gap-1.5 rounded-md px-2 font-medium text-muted-foreground',
+                'hover:bg-muted hover:text-foreground',
+                bulkOpen && 'bg-muted text-foreground',
               )}
-              data-icon="inline-end"
-            />
-          </Button>
+              onClick={() => setBulkOpen((open) => !open)}
+            >
+              <SlidersHorizontal data-icon="inline-start" />
+              {bulkOpen ? 'Hide bulk edit' : 'Bulk edit'}
+              <ChevronDown
+                className={cn(
+                  'size-3.5 opacity-60 transition-transform duration-200',
+                  bulkOpen && 'rotate-180',
+                )}
+                data-icon="inline-end"
+              />
+            </Button>
+          </div>
         </div>
       </div>
 
