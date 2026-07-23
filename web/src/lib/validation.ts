@@ -103,20 +103,28 @@ export function validateSheets(
   for (const sheet of sheets) {
     const issues: Issue[] = [];
 
-    if (sheet.needsOcr) {
-      issues.push({
-        code: 'needs-ocr',
-        blocking: true,
-        message: 'Scanned sheet — no readable text. Enter the sheet number manually.',
-      });
-    }
-
+    // A sheet with no number can't upload. `needsOcr` (a scan with no readable text)
+    // and a plain failed parse are the same blocker with different explanations, so
+    // they're mutually exclusive and BOTH gated on the number still being absent —
+    // otherwise the needs-ocr issue, keyed off a parse-time flag the user's edit can't
+    // change, would never clear once a number is typed in and the row would stay stuck
+    // as "Needs fix" forever. Drawbridge never uses Procore's OCR: the direct-upload
+    // path builds the Drawing from the typed metadata, so a hand-entered number is all
+    // a scanned sheet needs to upload like any other.
     if (!sheet.sheetNumber) {
-      issues.push({
-        code: 'missing-number',
-        blocking: true,
-        message: 'No sheet number found. Enter one to upload this sheet.',
-      });
+      issues.push(
+        sheet.needsOcr
+          ? {
+              code: 'needs-ocr',
+              blocking: true,
+              message: 'Scanned sheet — no readable text. Enter the sheet number manually.',
+            }
+          : {
+              code: 'missing-number',
+              blocking: true,
+              message: 'No sheet number found. Enter one to upload this sheet.',
+            },
+      );
     } else if (sheet.confidence > 0 && sheet.confidence < LOW_CONFIDENCE) {
       issues.push({
         code: 'low-confidence',

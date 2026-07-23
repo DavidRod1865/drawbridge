@@ -369,36 +369,29 @@ export function SheetPreviewDialog({
               </div>
             )}
 
+            {/* Zoom controls, pinned bottom-center of the stage so they never scroll away. */}
             {!error && (
-              <>
-                {/* How to drive the viewer — mouse/keyboard aren't discoverable on their own. */}
-                <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-full border bg-card/95 px-3 py-1 text-[11px] whitespace-nowrap text-muted-foreground shadow-sm backdrop-blur">
-                  Drag to pan · Ctrl/⌘ + scroll to zoom · ← → to change sheet
-                </div>
-
-                {/* Zoom controls, pinned bottom-center of the stage so they never scroll away. */}
-                <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-lg border bg-card/95 p-1 shadow-sm backdrop-blur">
-                  <Button variant="ghost" size="icon-sm" onClick={zoomOut} aria-label="Zoom out">
-                    <ZoomOut />
-                  </Button>
-                  <span className="w-12 text-center text-xs tabular-nums text-muted-foreground">
-                    {zoomPercent}%
-                  </span>
-                  <Button variant="ghost" size="icon-sm" onClick={zoomIn} aria-label="Zoom in">
-                    <ZoomIn />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={fitWidth}
-                    aria-label="Fit width"
-                    className="gap-1.5"
-                  >
-                    <Maximize2 />
-                    Fit
-                  </Button>
-                </div>
-              </>
+              <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-lg border bg-card/95 p-1 shadow-sm backdrop-blur">
+                <Button variant="ghost" size="icon-sm" onClick={zoomOut} aria-label="Zoom out">
+                  <ZoomOut />
+                </Button>
+                <span className="w-12 text-center text-xs tabular-nums text-muted-foreground">
+                  {zoomPercent}%
+                </span>
+                <Button variant="ghost" size="icon-sm" onClick={zoomIn} aria-label="Zoom in">
+                  <ZoomIn />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={fitWidth}
+                  aria-label="Fit width"
+                  className="gap-1.5"
+                >
+                  <Maximize2 />
+                  Fit
+                </Button>
+              </div>
             )}
           </div>
 

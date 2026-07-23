@@ -109,6 +109,16 @@ test('a scanned sheet blocks until a number is entered', () => {
   assert.ok(verdict.issues.some((i) => i.code === 'needs-ocr'));
 });
 
+test('entering a number clears the scan block — needsOcr is only a missing-number hint', () => {
+  // The user typed a sheet number into a scanned page. needsOcr is still true (it's a
+  // parse-time fact), but the direct-upload path builds the Drawing from typed metadata,
+  // so nothing should stay blocked.
+  const verdict = verdictFor(sheet({ needsOcr: true, sheetNumber: 'M-205.00', id: 'scan' }));
+  assert.notEqual(verdict.outcome, 'blocked');
+  assert.ok(!verdict.issues.some((i) => i.code === 'needs-ocr'));
+  assert.ok(!verdict.issues.some((i) => i.code === 'missing-number'));
+});
+
 test('two sheets claiming one number both block', () => {
   const a = sheet({ id: 'a', sourceFile: 'floor1.pdf' });
   const b = sheet({ id: 'b', sourceFile: 'floor2.pdf' });
@@ -129,7 +139,7 @@ test('a low-confidence parse warns without blocking', () => {
 
 test('summary refuses upload while anything is blocked', () => {
   const good = sheet({ id: 'good', sheetNumber: 'M-105.00' });
-  const bad = sheet({ id: 'bad', sheetNumber: 'M-205.00', needsOcr: true });
+  const bad = sheet({ id: 'bad', sheetNumber: null, needsOcr: true });
   const summary = summarize(validateSheets([good, bad], []));
 
   assert.equal(summary.total, 2);
