@@ -37,34 +37,29 @@ const STEPS: readonly { icon: LucideIcon; title: string; desc: string }[] = [
   },
 ];
 
-/** The numbered, connected "How it works" diagram. */
+/** The "How it works" flow, shown as the same card tiles as the drawing-area page. */
 function HowItWorks() {
   return (
     <section className="w-full" aria-label="How Drawbridge works">
       <p className="mb-6 text-center font-mono text-[11px] tracking-[0.2em] text-muted-foreground uppercase">
         How it works
       </p>
-      <ol className="grid gap-8 sm:grid-cols-4 sm:gap-4">
+      <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {STEPS.map((step, i) => (
-          <li key={step.title} className="relative flex flex-col items-center text-center">
-            {/* Connector to the previous step — desktop only; sits behind the circles. */}
-            {i > 0 && (
-              <span
-                className="absolute top-5 right-1/2 hidden h-px w-full -translate-y-1/2 bg-border sm:block"
-                aria-hidden
-              />
-            )}
-            {/* Orange accent on the icons and number badge keeps the stepper on-brand;
-                its smaller scale and placement below the card keep it from competing. */}
-            <div className="relative z-10 grid size-10 place-items-center rounded-full border bg-card text-primary">
-              <step.icon className="size-[18px]" aria-hidden />
-              {/* Step number, tucked at the corner so the sequence reads at a glance. */}
-              <span className="absolute -top-1.5 -right-1.5 grid size-4 place-items-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
-                {i + 1}
+          <li
+            key={step.title}
+            className="grid gap-3 rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <step.icon className="size-5" aria-hidden />
+              </span>
+              <span className="text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase">
+                Step {i + 1}
               </span>
             </div>
-            <div className="mt-3 text-sm font-medium">{step.title}</div>
-            <p className="mt-1 text-xs leading-snug text-muted-foreground">{step.desc}</p>
+            <h3 className="text-sm font-semibold">{step.title}</h3>
+            <p className="text-sm text-muted-foreground">{step.desc}</p>
           </li>
         ))}
       </ol>

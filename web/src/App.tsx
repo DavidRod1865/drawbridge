@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeftRight, Building2, ChevronRight, FolderOpen, Home, LogOut, Plus } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  Building2,
+  ChevronRight,
+  FileCheck2,
+  FilePlus2,
+  FolderOpen,
+  Home,
+  Layers,
+  LogOut,
+  MousePointerClick,
+  Plus,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -433,9 +445,71 @@ export function App() {
                     />
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Choose a Drawing Area to see its drawings and add new ones.
-                  </p>
+                  <div className="rounded-xl border border-dashed border-border bg-muted/30 p-6">
+                    <div className="flex flex-col items-center gap-3 text-center">
+                      <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <Layers className="size-6" />
+                      </span>
+                      <div className="grid gap-1.5">
+                        <h2 className="font-heading text-base font-semibold tracking-tight">
+                          Pick a Drawing Area to get started
+                        </h2>
+                        <p className="mx-auto max-w-xl text-sm text-muted-foreground">
+                          A Drawing Area is how Procore groups related sheets — a building, a
+                          phase, or a trade package. Select the one your set belongs to above,
+                          or create a new area if it doesn't exist yet.
+                        </p>
+                      </div>
+                    </div>
+
+                    <ol className="mt-6 grid gap-4 sm:grid-cols-3">
+                      <li className="grid gap-3 rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-primary/[0.03]">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                            <MousePointerClick className="size-5" />
+                          </span>
+                          <span className="text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase">
+                            Step 1
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-semibold">Select an area</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Drawbridge lists the drawings already in it, so you can see the
+                          current sheet numbers and revisions before adding anything.
+                        </p>
+                      </li>
+                      <li className="grid gap-3 rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-primary/[0.03]">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                            <FilePlus2 className="size-5" />
+                          </span>
+                          <span className="text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase">
+                            Step 2
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-semibold">Add drawings</h3>
+                        <p className="text-sm text-muted-foreground">
+                          The wizard walks you through uploading a new set or a revised sheet,
+                          and validates the package locally before anything is sent.
+                        </p>
+                      </li>
+                      <li className="grid gap-3 rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-primary/[0.03]">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                            <FileCheck2 className="size-5" />
+                          </span>
+                          <span className="text-[11px] font-semibold tracking-[0.05em] text-muted-foreground uppercase">
+                            Step 3
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-semibold">Upload, matched by number</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Sheets are matched to existing drawings by number, so a revision
+                          updates the right drawing instead of creating a duplicate.
+                        </p>
+                      </li>
+                    </ol>
+                  </div>
                 )}
               </>
             )}
