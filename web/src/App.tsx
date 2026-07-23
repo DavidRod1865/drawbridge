@@ -599,6 +599,18 @@ export function App() {
           </div>
         )}
       </main>
+
+      <footer className="border-t bg-card/90 px-4 py-3 text-xs text-muted-foreground backdrop-blur sm:px-6">
+        <div className="mx-auto flex w-full max-w-[1360px] flex-col items-center justify-between gap-1 text-center sm:flex-row sm:text-left">
+          <span>
+            © {new Date().getFullYear()} Drawbridge · Guided uploads for Procore Drawings
+          </span>
+          <span className="flex items-center gap-2">
+            Stateless by design — no drawings are stored; Procore is the source of truth.
+            <span className="font-mono text-muted-foreground/70">v{__APP_VERSION__}</span>
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }
