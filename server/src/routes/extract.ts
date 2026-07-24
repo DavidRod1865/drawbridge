@@ -74,9 +74,13 @@ export async function extractRoutes(app: FastifyInstance): Promise<void> {
     const items = request.body?.items;
     if (!Array.isArray(items) || items.length === 0) return reply.code(204).send();
 
+    // The client already restricts this to the title-block corner; this cap is a final
+    // guard so a pathological page can never exceed the provider's per-minute token limit.
+    const MAX_PROMPT_CHARS = 2000;
     const pageText = items
       .map((item) => `(${item.x.toFixed(2)},${item.y.toFixed(2)}) ${item.text}`)
-      .join('\n');
+      .join('\n')
+      .slice(0, MAX_PROMPT_CHARS);
 
     const upstream = await undiciRequest(`${config.llm.baseUrl}/chat/completions`, {
       method: 'POST',

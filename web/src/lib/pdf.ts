@@ -164,10 +164,10 @@ export async function parsePage(
   const match = pickSheetNumber(items);
   const heuristicTitle = pickTitle(items, match?.raw ?? null);
 
-  // Only consult the LLM when the heuristics are unsure about this sheet (or found no
-  // number). Confident sheets keep their local result and make no network call — the
-  // decision is per sheet, so one messy page in a clean package costs one request, not
-  // 60. Returns null (and costs nothing) when no extractor is installed.
+  // Gate first (to protect the daily token budget): only sheets the heuristics are unsure
+  // about are sent to the LLM. When one is sent, `reconcile` lets the LLM answer win; the
+  // heuristic is the fallback when the LLM returns nothing, errors, or the breaker has
+  // tripped. Confident sheets — and the case where no extractor is installed — cost nothing.
   const llm = shouldQueryLlm(match?.confidence ?? 0) ? await extractWithLlm(items) : null;
   const merged = reconcile({ match, title: heuristicTitle }, llm);
 

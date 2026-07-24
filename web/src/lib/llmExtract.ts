@@ -31,14 +31,14 @@ export function configureLlmExtractor(fn: LlmTransport | null): void {
 }
 
 /**
- * Heuristic confidence at or above which the local result is trusted outright and the
- * LLM is skipped. Set to the same ~0.5 "show this to the user" review line used in
- * sheetNumber.ts: an LLM call is only worth making on a sheet the heuristics were
- * already unsure about.
+ * Heuristic confidence at or above which the local result is trusted and the LLM is
+ * skipped, set to the ~0.5 "show this to the user" review line from sheetNumber.ts.
  *
- * This gate is per sheet, so a clean 60-page package where the heuristics are confident
- * makes few calls (or none) rather than 60 — which is what keeps large uploads under the
- * provider's per-minute limit.
+ * This gate exists to protect the provider's DAILY token budget: on clean vector
+ * drawings the heuristics already score ~1.0 and are correct, so calling the LLM there
+ * spends tokens for no gain. Restricting calls to sheets the heuristics are unsure about
+ * is the only lever that reduces the *number* of calls (the region filter only reduces
+ * tokens *per* call). When we do call, `reconcile` still lets the LLM answer win.
  */
 export const LLM_CONFIDENCE_THRESHOLD = 0.5;
 
@@ -60,13 +60,43 @@ export function resetLlmCircuit(): void {
 }
 
 /**
- * Default transport: POSTs page text to the server through `apiFetch`. `maxAttempts: 1`
- * is deliberate — we do NOT want apiFetch to sleep on a big `Retry-After` and stall
- * parsing; a rate limit should fail fast so `extractWithLlm` can trip the breaker and
- * move on. A 204 (LLM disabled server-side) comes back as `null`.
+ * The bottom-right corner where the title block (sheet number + title) sits. Only these
+ * items are sent to the LLM. A full drawing page is thousands of tokens of schedules,
+ * notes, and dimensions — enough to blow the provider's per-minute token limit on a
+ * single dense sheet (observed: one page = 13k tokens vs an 8k TPM cap). The number and
+ * title live in this corner, so restricting to it cuts tokens ~10x and removes noise.
+ */
+const TITLE_BLOCK_MIN_X = 0.72;
+const TITLE_BLOCK_MIN_Y = 0.62;
+
+/** Hard ceiling on how many corner items we send, in case a dense corner slips through. */
+const MAX_TITLE_BLOCK_ITEMS = 80;
+
+/** Filters page items down to the title-block corner, capped, nearest-corner first. */
+export function titleBlockItems(items: readonly TextItem[]): TextItem[] {
+  const region = items.filter(
+    (item) => item.x >= TITLE_BLOCK_MIN_X && item.y >= TITLE_BLOCK_MIN_Y,
+  );
+  if (region.length <= MAX_TITLE_BLOCK_ITEMS) return region;
+  // Too dense to send whole — keep the items closest to the bottom-right corner.
+  return [...region]
+    .sort((a, b) => b.x + b.y - (a.x + a.y))
+    .slice(0, MAX_TITLE_BLOCK_ITEMS);
+}
+
+/**
+ * Default transport: sends only the title-block corner to the server through `apiFetch`.
+ * `maxAttempts: 1` is deliberate — we do NOT want apiFetch to sleep on a big `Retry-After`
+ * and stall parsing; a rate limit should fail fast so `extractWithLlm` can trip the
+ * breaker and move on. A 204 (LLM disabled server-side, or an empty corner) comes back
+ * as `null`.
  */
 export const httpLlmTransport: LlmTransport = (items) =>
-  apiFetch<LlmExtraction | null>('/api/extract', { method: 'POST', body: { items }, maxAttempts: 1 });
+  apiFetch<LlmExtraction | null>('/api/extract', {
+    method: 'POST',
+    body: { items: titleBlockItems(items) },
+    maxAttempts: 1,
+  });
 
 /**
  * Runs the configured extractor. Returns null — never throws — on any failure, so a

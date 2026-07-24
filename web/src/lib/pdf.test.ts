@@ -98,7 +98,7 @@ async function buildAmbiguousPackage(): Promise<ArrayBuffer> {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-test('a confident sheet is NOT sent to the LLM', async () => {
+test('a confident sheet is NOT sent to the LLM (protects the token budget)', async () => {
   // Bottom-right title block => high confidence => the gate should skip the network call.
   let called = false;
   configureLlmExtractor(async () => {
@@ -116,7 +116,6 @@ test('a confident sheet is NOT sent to the LLM', async () => {
 });
 
 test('a low-confidence sheet is sent to the LLM and its answer wins', async () => {
-  // The heuristic reads A-101 but at low confidence; the LLM (mocked) corrects it.
   configureLlmExtractor(async () => ({ sheetNumber: 'M-105.00', title: 'MECHANICAL PLAN' }));
   try {
     const data = await buildAmbiguousPackage();
@@ -125,6 +124,17 @@ test('a low-confidence sheet is sent to the LLM and its answer wins', async () =
     assert.equal(sheet?.title, 'MECHANICAL PLAN');
     assert.equal(sheet?.discipline, 'Mechanical'); // derived from the winning number
     assert.equal(sheet?.confidence, 0.5); // disagreement with the heuristic
+  } finally {
+    configureLlmExtractor(null);
+  }
+});
+
+test('a low-confidence sheet falls back to the heuristic when the LLM returns nothing', async () => {
+  configureLlmExtractor(async () => ({ sheetNumber: null, title: null }));
+  try {
+    const data = await buildAmbiguousPackage();
+    const [sheet] = await parseFile(data, 'ambiguous.pdf');
+    assert.equal(sheet?.sheetNumber, 'A-101'); // the local pick stands
   } finally {
     configureLlmExtractor(null);
   }
