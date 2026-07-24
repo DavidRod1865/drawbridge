@@ -153,3 +153,59 @@ export function disciplineFor(prefix: string): string {
   // Multi-letter prefixes ('AD' = architectural demolition) key off the first letter.
   return DISCIPLINES[prefix[0] ?? ''] ?? 'General';
 }
+
+/** The subset of a parsed sheet that number/title extraction produces. */
+export interface ExtractedMetadata {
+  sheetNumber: string | null;
+  title: string | null;
+  discipline: string | null;
+  /** 0..1. Below ~0.5 means "show this to the user before uploading". */
+  confidence: number;
+}
+
+/**
+ * Merges the positional heuristic with an optional LLM extraction into one result.
+ *
+ * The LLM is the primary source for the number and title; the heuristic is kept as a
+ * cross-check on the number so agreement can *raise* confidence and disagreement can
+ * *lower* it (both answers can't be right, so we take the LLM but flag it for review).
+ * When the LLM is unavailable (`llm === null`) this reduces exactly to the old
+ * heuristic-only behavior.
+ *
+ * Discipline is deliberately never taken from the LLM: it is derived from whichever
+ * number won, through the validated `disciplineFor` map, so a hallucinated discipline
+ * can never reach Procore.
+ */
+export function reconcile(
+  heuristic: { match: SheetNumberResult | null; title: string | null },
+  llm: { sheetNumber: string | null; title: string | null } | null,
+): ExtractedMetadata {
+  const heuristicNumber = heuristic.match?.raw ?? null;
+  const llmNumber = llm?.sheetNumber?.trim() ? llm.sheetNumber.trim() : null;
+
+  // LLM wins on the number; fall back to the heuristic's pick when the LLM has none.
+  const sheetNumber = llmNumber ?? heuristicNumber;
+
+  // Discipline follows the chosen number through the validated map, not the LLM.
+  const parsed = sheetNumber ? parseSheetNumber(sheetNumber) : null;
+  const discipline = parsed ? disciplineFor(parsed.discipline) : null;
+
+  const llmTitle = llm?.title?.trim() ? llm.title.trim() : null;
+  const title = llmTitle ?? heuristic.title;
+
+  let confidence: number;
+  if (llmNumber && heuristicNumber) {
+    // Both found a number: agreement is strong corroboration; disagreement means one is
+    // wrong, so keep the LLM's but flag it low enough to surface on the review screen.
+    const agree = normalizeSheetNumber(llmNumber) === normalizeSheetNumber(heuristicNumber);
+    confidence = agree ? 0.95 : 0.5;
+  } else if (llmNumber) {
+    // The LLM found a number the heuristic missed — plausible but uncorroborated.
+    confidence = 0.7;
+  } else {
+    // No LLM number: defer to the heuristic's own score (0 when it found nothing either).
+    confidence = heuristic.match?.confidence ?? 0;
+  }
+
+  return { sheetNumber, title, discipline, confidence: Number(confidence.toFixed(3)) };
+}

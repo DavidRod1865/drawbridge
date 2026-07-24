@@ -7,6 +7,7 @@ import { config } from './config.ts';
 import { authRoutes } from './routes/auth.ts';
 import { proxyRoutes } from './routes/proxy.ts';
 import { drawingRoutes } from './routes/drawings.ts';
+import { extractRoutes } from './routes/extract.ts';
 
 const app = Fastify({
   logger: {
@@ -42,6 +43,7 @@ app.get('/api/health', async () => ({ ok: true, procoreEnv: config.procore.env }
 await app.register(authRoutes);
 await app.register(proxyRoutes);
 await app.register(drawingRoutes);
+await app.register(extractRoutes);
 
 // In production the server is the single origin: it serves the built SPA alongside the
 // `/api/*` routes above. This is what keeps the httpOnly session cookie same-origin (no

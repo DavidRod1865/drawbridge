@@ -61,6 +61,23 @@ export const config = {
    * Generate with: openssl rand -hex 32
    */
   sessionKey: Buffer.from(required('SESSION_ENCRYPTION_KEY'), 'hex'),
+
+  /**
+   * Optional LLM used to improve sheet number/title extraction. Null when no key is
+   * configured — the app then falls back to the positional heuristics, so this is a
+   * pure enhancement and never a boot requirement. Provider-agnostic on purpose: any
+   * OpenAI-compatible endpoint works, so switching providers is a base-URL/model change,
+   * not a code change. Defaults target Groq's free tier.
+   */
+  llm: process.env.LLM_API_KEY
+    ? {
+        apiKey: process.env.LLM_API_KEY,
+        baseUrl: process.env.LLM_BASE_URL ?? 'https://api.groq.com/openai/v1',
+        // On Groq, strict JSON-schema Structured Outputs (which extract.ts relies on)
+        // are supported ONLY by the gpt-oss models — a llama/qwen model here would 400.
+        model: process.env.LLM_MODEL ?? 'openai/gpt-oss-20b',
+      }
+    : null,
 } as const;
 
 if (config.sessionKey.length !== 32) {

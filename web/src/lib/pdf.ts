@@ -13,7 +13,8 @@
 import * as pdfjs from 'pdfjs-dist';
 import type { PDFDocumentProxy, TextItem as PdfTextItem } from 'pdfjs-dist/types/src/display/api';
 import { PDFDocument } from 'pdf-lib';
-import { disciplineFor, pickSheetNumber, type TextItem } from './sheetNumber.ts';
+import { pickSheetNumber, reconcile, type TextItem } from './sheetNumber.ts';
+import { extractWithLlm, resetLlmCircuit, shouldQueryLlm } from './llmExtract.ts';
 
 /**
  * The pdf.js worker is located differently per environment — Vite rewrites it to a
@@ -161,18 +162,30 @@ export async function parsePage(
   }
 
   const match = pickSheetNumber(items);
+  const heuristicTitle = pickTitle(items, match?.raw ?? null);
+
+  // Only consult the LLM when the heuristics are unsure about this sheet (or found no
+  // number). Confident sheets keep their local result and make no network call — the
+  // decision is per sheet, so one messy page in a clean package costs one request, not
+  // 60. Returns null (and costs nothing) when no extractor is installed.
+  const llm = shouldQueryLlm(match?.confidence ?? 0) ? await extractWithLlm(items) : null;
+  const merged = reconcile({ match, title: heuristicTitle }, llm);
+
   return {
     sourceFile,
     pageIndex: pageNumber - 1,
-    sheetNumber: match?.raw ?? null,
-    title: pickTitle(items, match?.raw ?? null),
-    discipline: match ? disciplineFor(match.discipline) : null,
-    confidence: match?.confidence ?? 0,
+    sheetNumber: merged.sheetNumber,
+    title: merged.title,
+    discipline: merged.discipline,
+    confidence: merged.confidence,
     needsOcr: false,
   };
 }
 
 export async function parseFile(data: ArrayBuffer, sourceFile: string): Promise<ParsedSheet[]> {
+  // Re-arm the LLM circuit breaker so a limit hit on a previous package doesn't keep the
+  // LLM disabled for this one (a later upload, or a retry after the daily quota resets).
+  resetLlmCircuit();
   const doc = await loadDocument(data);
   try {
     const sheets: ParsedSheet[] = [];

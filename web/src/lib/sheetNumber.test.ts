@@ -5,6 +5,8 @@ import {
   normalizeSheetNumber,
   parseSheetNumber,
   pickSheetNumber,
+  reconcile,
+  type SheetNumberResult,
   type TextItem,
 } from './sheetNumber.ts';
 
@@ -68,4 +70,58 @@ test('maps discipline prefixes, including multi-letter ones', () => {
   assert.equal(disciplineFor('S'), 'Structural');
   assert.equal(disciplineFor('AD'), 'Architectural');
   assert.equal(disciplineFor('X'), 'General');
+});
+
+/** A realistic heuristic pick, built through the real scorer. */
+const heuristicMatch = (raw: string): SheetNumberResult =>
+  pickSheetNumber([at(raw, 0.9, 0.94)])!;
+
+test('reconcile with no LLM reduces to the heuristic result', () => {
+  const match = heuristicMatch('A-101');
+  const merged = reconcile({ match, title: 'FIRST FLOOR PLAN' }, null);
+  assert.equal(merged.sheetNumber, 'A-101');
+  assert.equal(merged.title, 'FIRST FLOOR PLAN');
+  assert.equal(merged.discipline, 'Architectural');
+  assert.equal(merged.confidence, match.confidence);
+});
+
+test('reconcile raises confidence when LLM and heuristic agree', () => {
+  const match = heuristicMatch('A-101');
+  const merged = reconcile(
+    { match, title: 'FIRST FLOOR PLAN' },
+    { sheetNumber: 'A-101', title: 'FIRST FLOOR PLAN' },
+  );
+  assert.equal(merged.sheetNumber, 'A-101');
+  assert.equal(merged.confidence, 0.95);
+});
+
+test('agreement is judged on normalized form, not exact spelling', () => {
+  const match = heuristicMatch('A-101');
+  const merged = reconcile({ match, title: null }, { sheetNumber: 'A101', title: null });
+  assert.equal(merged.confidence, 0.95);
+});
+
+test('reconcile takes the LLM number but flags it when they disagree', () => {
+  const match = heuristicMatch('S1'); // the classic job-number-fragment false positive
+  const merged = reconcile({ match, title: null }, { sheetNumber: 'M-105.00', title: null });
+  assert.equal(merged.sheetNumber, 'M-105.00');
+  assert.equal(merged.discipline, 'Mechanical'); // discipline follows the winning number
+  assert.equal(merged.confidence, 0.5);
+});
+
+test('reconcile trusts the LLM when the heuristic found nothing', () => {
+  const merged = reconcile(
+    { match: null, title: null },
+    { sheetNumber: 'E-001', title: 'ELECTRICAL PLAN' },
+  );
+  assert.equal(merged.sheetNumber, 'E-001');
+  assert.equal(merged.title, 'ELECTRICAL PLAN');
+  assert.equal(merged.discipline, 'Electrical');
+  assert.equal(merged.confidence, 0.7);
+});
+
+test('reconcile falls back to the heuristic title when the LLM omits one', () => {
+  const match = heuristicMatch('A-101');
+  const merged = reconcile({ match, title: 'FIRST FLOOR PLAN' }, { sheetNumber: 'A-101', title: null });
+  assert.equal(merged.title, 'FIRST FLOOR PLAN');
 });
