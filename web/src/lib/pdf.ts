@@ -14,7 +14,7 @@ import * as pdfjs from 'pdfjs-dist';
 import type { PDFDocumentProxy, TextItem as PdfTextItem } from 'pdfjs-dist/types/src/display/api';
 import { PDFDocument } from 'pdf-lib';
 import { pickSheetNumber, reconcile, type TextItem } from './sheetNumber.ts';
-import { extractWithLlm, resetLlmCircuit, shouldQueryLlm } from './llmExtract.ts';
+import { extractWithLlm, resetLlmCircuit } from './llmExtract.ts';
 
 /**
  * The pdf.js worker is located differently per environment — Vite rewrites it to a
@@ -164,11 +164,11 @@ export async function parsePage(
   const match = pickSheetNumber(items);
   const heuristicTitle = pickTitle(items, match?.raw ?? null);
 
-  // Gate first (to protect the daily token budget): only sheets the heuristics are unsure
-  // about are sent to the LLM. When one is sent, `reconcile` lets the LLM answer win; the
-  // heuristic is the fallback when the LLM returns nothing, errors, or the breaker has
-  // tripped. Confident sheets — and the case where no extractor is installed — cost nothing.
-  const llm = shouldQueryLlm(match?.confidence ?? 0) ? await extractWithLlm(items) : null;
+  // LLM first: every sheet is sent to the extractor (title-block corner only, so each call
+  // is cheap), and `reconcile` lets the LLM answer win. The heuristic is the fallback —
+  // used when the LLM returns nothing, errors, or the circuit breaker has tripped after a
+  // rate limit (extractWithLlm then returns null). Costs nothing when no extractor exists.
+  const llm = await extractWithLlm(items);
   const merged = reconcile({ match, title: heuristicTitle }, llm);
 
   return {

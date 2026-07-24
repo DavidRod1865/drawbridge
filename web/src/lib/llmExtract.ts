@@ -31,22 +31,6 @@ export function configureLlmExtractor(fn: LlmTransport | null): void {
 }
 
 /**
- * Heuristic confidence at or above which the local result is trusted and the LLM is
- * skipped, set to the ~0.5 "show this to the user" review line from sheetNumber.ts.
- *
- * This gate exists to protect the provider's DAILY token budget: on clean vector
- * drawings the heuristics already score ~1.0 and are correct, so calling the LLM there
- * spends tokens for no gain. Restricting calls to sheets the heuristics are unsure about
- * is the only lever that reduces the *number* of calls (the region filter only reduces
- * tokens *per* call). When we do call, `reconcile` still lets the LLM answer win.
- */
-export const LLM_CONFIDENCE_THRESHOLD = 0.5;
-
-export function shouldQueryLlm(heuristicConfidence: number): boolean {
-  return heuristicConfidence < LLM_CONFIDENCE_THRESHOLD;
-}
-
-/**
  * Circuit breaker. Extraction is one request *per sheet*, so a 200-page package is 200
  * requests — once the provider rate-limits us, every remaining sheet would be limited
  * too. Rather than wait on (or hammer) the limit sheet after sheet, the first 429 trips

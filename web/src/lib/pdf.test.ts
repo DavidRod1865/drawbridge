@@ -85,41 +85,18 @@ test('extractPage yields a standalone single-page PDF', async () => {
   assert.equal(sheets[0]?.sheetNumber, 'A-102');
 });
 
-/** A page with the sheet number tucked top-left, so the heuristics score it low. */
-async function buildAmbiguousPackage(): Promise<ArrayBuffer> {
-  const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const page = doc.addPage([1224, 792]);
-  // Top-left corner: heavily discounted by the scorer, so confidence lands below the
-  // review line and this sheet becomes a candidate for the LLM.
-  page.drawText('A-101', { x: 40, y: 740, size: 12, font });
-  page.drawText('SOME GENERAL NOTES FOR EXTRACTABLE TEXT', { x: 40, y: 700, size: 12, font });
-  const bytes = await doc.save();
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-}
-
-test('a confident sheet is NOT sent to the LLM (protects the token budget)', async () => {
-  // Bottom-right title block => high confidence => the gate should skip the network call.
+test('the LLM is consulted on every sheet and its answer wins', async () => {
+  // A-101 sits in the bottom-right title block, so the heuristic is confident — yet the
+  // LLM is still consulted (LLM-first) and its corrected number wins.
   let called = false;
   configureLlmExtractor(async () => {
     called = true;
-    return { sheetNumber: 'X-999', title: 'SHOULD NOT WIN' };
+    return { sheetNumber: 'M-105.00', title: 'MECHANICAL PLAN' };
   });
   try {
     const data = await buildPackage([{ number: 'A-101', title: 'FIRST FLOOR PLAN' }]);
     const [sheet] = await parseFile(data, 'one.pdf');
-    assert.equal(called, false, 'a confident heuristic should not spend an LLM call');
-    assert.equal(sheet?.sheetNumber, 'A-101');
-  } finally {
-    configureLlmExtractor(null);
-  }
-});
-
-test('a low-confidence sheet is sent to the LLM and its answer wins', async () => {
-  configureLlmExtractor(async () => ({ sheetNumber: 'M-105.00', title: 'MECHANICAL PLAN' }));
-  try {
-    const data = await buildAmbiguousPackage();
-    const [sheet] = await parseFile(data, 'ambiguous.pdf');
+    assert.equal(called, true, 'every sheet should be sent to the LLM');
     assert.equal(sheet?.sheetNumber, 'M-105.00');
     assert.equal(sheet?.title, 'MECHANICAL PLAN');
     assert.equal(sheet?.discipline, 'Mechanical'); // derived from the winning number
@@ -129,12 +106,13 @@ test('a low-confidence sheet is sent to the LLM and its answer wins', async () =
   }
 });
 
-test('a low-confidence sheet falls back to the heuristic when the LLM returns nothing', async () => {
+test('falls back to the heuristic when the LLM returns nothing', async () => {
   configureLlmExtractor(async () => ({ sheetNumber: null, title: null }));
   try {
-    const data = await buildAmbiguousPackage();
-    const [sheet] = await parseFile(data, 'ambiguous.pdf');
+    const data = await buildPackage([{ number: 'A-101', title: 'FIRST FLOOR PLAN' }]);
+    const [sheet] = await parseFile(data, 'one.pdf');
     assert.equal(sheet?.sheetNumber, 'A-101'); // the local pick stands
+    assert.equal(sheet?.title, 'FIRST FLOOR PLAN');
   } finally {
     configureLlmExtractor(null);
   }

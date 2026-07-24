@@ -5,18 +5,9 @@ import {
   extractWithLlm,
   resetLlmCircuit,
   titleBlockItems,
-  shouldQueryLlm,
-  LLM_CONFIDENCE_THRESHOLD,
 } from './llmExtract.ts';
 import { ProcoreApiError } from './api.ts';
 import type { TextItem } from './sheetNumber.ts';
-
-test('shouldQueryLlm gates on the confidence threshold', () => {
-  assert.equal(shouldQueryLlm(0), true); // nothing found — let the LLM try
-  assert.equal(shouldQueryLlm(0.49), true); // below the review line
-  assert.equal(shouldQueryLlm(LLM_CONFIDENCE_THRESHOLD), false); // trusted outright
-  assert.equal(shouldQueryLlm(0.9), false);
-});
 
 test('titleBlockItems keeps only the bottom-right corner', () => {
   const kept = titleBlockItems([
